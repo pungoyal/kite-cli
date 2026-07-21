@@ -130,6 +130,7 @@ Examples:
   $ kite orders place NSE:INFY -s BUY -q 1 --dry-run
                                                 Preview an order without sending it
   $ kite positions --json | jq '.net[].pnl'     Machine-readable output
+  $ kite --profile huf holdings                 Run against another account (kite profiles)
 
 Safety:
   Order commands preview the resolved order and ask for confirmation.

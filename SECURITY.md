@@ -33,7 +33,7 @@ What this tool defends against:
 - **Credential leakage in output.** Every log line, error, and stack trace passes through a redactor. The two paths that carry an access token — the `Authorization` header and the WebSocket URL query string — are handled explicitly and covered by tests.
 - **Secrets in process listings.** The API secret is never accepted as a command-line argument, since argv is world-readable via `ps` and persists in shell history.
 - **Login interception.** The callback server binds to `127.0.0.1` only, and the request token is validated against a random CSRF state compared in constant time.
-- **Accidental and duplicated orders.** Confirmation with a resolved-order preview, escalation to typed confirmation above a threshold, an explicit kill switch, an order value cap, and dry-run. No mutating HTTP verb is ever retried automatically.
+- **Accidental, duplicated, and wrong-account orders.** Confirmation with a resolved-order preview — which names the *verified* account (the user id Kite returned, not just the chosen label) — escalation to typed confirmation above a threshold, an explicit kill switch, a per-profile order value cap, and dry-run. No mutating HTTP verb is ever retried automatically. With multiple accounts, an explicitly named profile is never silently overridden by an ambient `KITE_ACCESS_TOKEN` / `KITE_API_SECRET`, and each account's secrets are stored under a separate namespace.
 - **Supply chain.** Trusted Publishing via OIDC with no long-lived token, provenance attestation, SHA-pinned CI actions, `ignore-scripts`, a dependency release cooldown, and a deliberately small dependency tree.
 
 What it does not defend against:

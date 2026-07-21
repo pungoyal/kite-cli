@@ -58,6 +58,8 @@ kite login --env sandbox
 kite --env sandbox holdings
 ```
 
+**Running more than one Zerodha account?** See [Multiple accounts](#multiple-accounts).
+
 ## Usage
 
 ### Portfolio
