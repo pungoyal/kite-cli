@@ -160,6 +160,184 @@ describe('GTT serialisation', () => {
   });
 });
 
+describe('alert serialisation', () => {
+  it('sends a simple constant alert as plain form fields', async () => {
+    let body = '';
+    pool()
+      .intercept({ path: '/alerts', method: 'POST' })
+      .reply((opts) => {
+        body = String(opts.body);
+        return {
+          statusCode: 200,
+          data: { status: 'success', data: { uuid: 'abc', type: 'simple', status: 'enabled' } },
+        };
+      });
+
+    const created = await api().createAlert({
+      name: 'NIFTY high',
+      type: 'simple',
+      lhs_exchange: 'INDICES',
+      lhs_tradingsymbol: 'NIFTY 50',
+      lhs_attribute: 'LastTradedPrice',
+      operator: '>=',
+      rhs_type: 'constant',
+      rhs_constant: 27000,
+    });
+
+    expect(created.uuid).toBe('abc');
+    const params = new URLSearchParams(body);
+    expect(params.get('type')).toBe('simple');
+    expect(params.get('operator')).toBe('>=');
+    expect(params.get('rhs_type')).toBe('constant');
+    expect(params.get('rhs_constant')).toBe('27000');
+    // A constant alert must not leak instrument fields.
+    expect(params.get('rhs_tradingsymbol')).toBeNull();
+    // basket is only for ato.
+    expect(params.get('basket')).toBeNull();
+  });
+
+  it('encodes an ATO basket as a JSON string inside a form field', async () => {
+    let body = '';
+    pool()
+      .intercept({ path: '/alerts', method: 'POST' })
+      .reply((opts) => {
+        body = String(opts.body);
+        return { statusCode: 200, data: { status: 'success', data: { uuid: 'xyz', type: 'ato', status: 'enabled' } } };
+      });
+
+    await api().createAlert({
+      name: 'buy gold',
+      type: 'ato',
+      lhs_exchange: 'NSE',
+      lhs_tradingsymbol: 'GOLDBEES',
+      lhs_attribute: 'LastTradedPrice',
+      operator: '<=',
+      rhs_type: 'constant',
+      rhs_constant: 71.8,
+      basket: {
+        name: 'kite-cli-alert',
+        type: 'alert',
+        tags: [],
+        items: [
+          {
+            type: 'insert',
+            tradingsymbol: 'GOLDBEES',
+            exchange: 'NSE',
+            weight: 10000,
+            params: { transaction_type: 'BUY', order_type: 'LIMIT', product: 'CNC', quantity: 10, price: 72 },
+          },
+        ],
+      },
+    });
+
+    const params = new URLSearchParams(body);
+    expect(params.get('type')).toBe('ato');
+    // basket is a JSON-encoded string, not repeated form fields.
+    const basket = JSON.parse(params.get('basket') ?? '{}');
+    expect(basket.items[0]).toMatchObject({ tradingsymbol: 'GOLDBEES', params: { transaction_type: 'BUY' } });
+  });
+
+  it('sends instrument-comparison fields when rhs_type is instrument', async () => {
+    let body = '';
+    pool()
+      .intercept({ path: '/alerts', method: 'POST' })
+      .reply((opts) => {
+        body = String(opts.body);
+        return { statusCode: 200, data: { status: 'success', data: { uuid: 'i', type: 'simple', status: 'enabled' } } };
+      });
+
+    await api().createAlert({
+      name: 'pair',
+      type: 'simple',
+      lhs_exchange: 'NSE',
+      lhs_tradingsymbol: 'INFY',
+      lhs_attribute: 'LastTradedPrice',
+      operator: '>',
+      rhs_type: 'instrument',
+      rhs_exchange: 'NSE',
+      rhs_tradingsymbol: 'TCS',
+      rhs_attribute: 'LastTradedPrice',
+    });
+
+    const params = new URLSearchParams(body);
+    expect(params.get('rhs_type')).toBe('instrument');
+    expect(params.get('rhs_tradingsymbol')).toBe('TCS');
+    // An instrument comparison must not carry a stray constant.
+    expect(params.get('rhs_constant')).toBeNull();
+  });
+
+  it('parses a rich ATO alert without dropping the basket or throwing on extra fields', async () => {
+    // The documented ATO payload carries a nested basket with fields we never
+    // send (instrument_token, gtt, validity_ttl). The loose schema must pass
+    // them through rather than reject a real alert (invariant #5).
+    pool()
+      .intercept({ path: '/alerts', method: 'GET' })
+      .reply(200, {
+        status: 'success',
+        data: [
+          {
+            type: 'ato',
+            user_id: 'AB1234',
+            uuid: 'e888ed4a-6801-406f-bdc2-002db5a8411d',
+            name: 'buy gold',
+            status: 'disabled',
+            lhs_attribute: 'LastTradedPrice',
+            lhs_exchange: 'NSE',
+            lhs_tradingsymbol: 'GOLDBEES',
+            operator: '<=',
+            rhs_type: 'constant',
+            rhs_constant: 71.8,
+            alert_count: 1,
+            basket: {
+              items: [
+                {
+                  id: 275218517,
+                  tradingsymbol: 'GOLDBEES',
+                  exchange: 'NSE',
+                  instrument_token: 3693569,
+                  weight: 10000,
+                  params: {
+                    validity: 'DAY',
+                    validity_ttl: 0,
+                    variety: 'regular',
+                    product: 'CNC',
+                    order_type: 'LIMIT',
+                    transaction_type: 'BUY',
+                    quantity: 10000,
+                    price: 72.22,
+                    gtt: { target: 0, stoploss: 0 },
+                    tags: [],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+    const alerts = await api().getAlerts();
+    expect(alerts[0]?.type).toBe('ato');
+    expect(alerts[0]?.basket?.items[0]?.tradingsymbol).toBe('GOLDBEES');
+    expect(alerts[0]?.basket?.items[0]?.instrument_token).toBe(3693569);
+  });
+
+  it('deletes alerts via repeated uuid query params, not a path segment', async () => {
+    let requestPath = '';
+    pool()
+      .intercept({ path: (p) => p.startsWith('/alerts'), method: 'DELETE' })
+      .reply((opts) => {
+        requestPath = String(opts.path);
+        return { statusCode: 200, data: { status: 'success', data: {} } };
+      });
+
+    await api().deleteAlerts(['aaa', 'bbb']);
+    expect(requestPath).toContain('uuid=aaa');
+    expect(requestPath).toContain('uuid=bbb');
+    // The uuids are query params — they must not become path segments.
+    expect(requestPath).not.toContain('/alerts/aaa');
+  });
+});
+
 describe('authorisationUrl', () => {
   it('encodes the api key and request id into the CDSL authorisation URL', () => {
     const url = api().authorisationUrl('req/123');

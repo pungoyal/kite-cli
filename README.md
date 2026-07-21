@@ -138,7 +138,28 @@ kite gtt place NSE:INFY --side SELL --quantity 10 \
   --trigger 1400 --price 1395 \
   --trigger 1700 --price 1695          # two-leg OCO
 kite gtt delete <id>
+
+kite alerts list                       # your price alerts
+kite alerts create "INDICES:NIFTY 50" --operator above --value 27000
+kite alerts get <uuid>                 # detail, incl. any attached order
+kite alerts history <uuid>             # when it has fired
+kite alerts delete <uuid> [<uuid>...]
 ```
+
+Alerts come in two kinds. A **simple** alert just notifies you when a price
+condition is met — it moves no money, so the kill switch and value cap do not
+apply. An **ATO** (Alert-Triggers-Order) alert places a real order when it fires,
+so creating one goes through the same confirmation, value cap and kill switch as
+`orders place`:
+
+```bash
+kite alerts create NSE:INFY --operator below --value 1400 \
+  --type ato --side BUY --quantity 10 --order-type LIMIT --price 1400
+```
+
+`--operator` accepts the raw symbols (`>=`, `<=`, `>`, `<`, `==`) or the aliases
+`above`, `below`, `ge`, `le`, `gt`, `lt`, `eq`. Compare against another instrument
+instead of a constant with `--rhs-instrument EXCHANGE:SYMBOL`.
 
 Add `--dry-run` to any of these to see exactly what would be sent, without sending it.
 

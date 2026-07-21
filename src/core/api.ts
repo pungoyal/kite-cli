@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { KiteClient } from './client.js';
 import { UsageError } from './errors.js';
 import {
+  AlertHistoryEntrySchema,
+  AlertSchema,
   AuctionSchema,
   BasketMarginSchema,
   type Candle,
@@ -276,6 +278,74 @@ export class KiteApi {
       method: 'DELETE',
       path: `/gtt/triggers/${id}`,
       schema: GttCreateResultSchema,
+      signal,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Alerts
+  // -------------------------------------------------------------------------
+
+  async getAlerts(signal?: AbortSignal) {
+    return this.client.request({
+      method: 'GET',
+      path: '/alerts',
+      schema: z.array(AlertSchema),
+      signal,
+    });
+  }
+
+  async getAlert(uuid: string, signal?: AbortSignal) {
+    return this.client.request({
+      method: 'GET',
+      path: `/alerts/${encodeURIComponent(uuid)}`,
+      schema: AlertSchema,
+      signal,
+    });
+  }
+
+  async getAlertHistory(uuid: string, signal?: AbortSignal) {
+    return this.client.request({
+      method: 'GET',
+      path: `/alerts/${encodeURIComponent(uuid)}/history`,
+      schema: z.array(AlertHistoryEntrySchema),
+      signal,
+    });
+  }
+
+  async createAlert(params: AlertParams, signal?: AbortSignal) {
+    return this.client.request({
+      method: 'POST',
+      path: '/alerts',
+      schema: AlertSchema,
+      form: serialiseAlert(params),
+      signal,
+    });
+  }
+
+  async modifyAlert(uuid: string, params: AlertParams, signal?: AbortSignal) {
+    return this.client.request({
+      method: 'PUT',
+      path: `/alerts/${encodeURIComponent(uuid)}`,
+      schema: AlertSchema,
+      form: serialiseAlert(params),
+      signal,
+    });
+  }
+
+  /**
+   * Delete one or more alerts.
+   *
+   * Kite takes the uuids as *repeated query parameters* (`?uuid=a&uuid=b`) on a
+   * DELETE, not a path segment or a form body — an easy thing to carry over
+   * wrongly from the GTT delete, which is path-keyed by a numeric id.
+   */
+  async deleteAlerts(uuids: string[], signal?: AbortSignal) {
+    return this.client.request({
+      method: 'DELETE',
+      path: '/alerts',
+      query: { uuid: uuids },
+      schema: z.unknown(),
       signal,
     });
   }
@@ -562,6 +632,85 @@ function serialiseGtt(params: GttParams): Record<string, string> {
     condition: JSON.stringify(params.condition),
     orders: JSON.stringify(params.orders),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Alert serialisation
+// ---------------------------------------------------------------------------
+
+export const ALERT_TYPES = ['simple', 'ato'] as const;
+export type AlertType = (typeof ALERT_TYPES)[number];
+
+/** Kite's raw comparison operators. The CLI accepts friendlier aliases and
+ * normalises to these before they reach the wire. */
+export const ALERT_OPERATORS = ['<=', '>=', '<', '>', '=='] as const;
+export type AlertOperator = (typeof ALERT_OPERATORS)[number];
+
+export const ALERT_RHS_TYPES = ['constant', 'instrument'] as const;
+export type AlertRhsType = (typeof ALERT_RHS_TYPES)[number];
+
+/** The only left/right attribute Kite documents for alerts. */
+export const ALERT_DEFAULT_ATTRIBUTE = 'LastTradedPrice';
+
+export interface AlertBasketItem {
+  type: 'insert';
+  tradingsymbol: string;
+  exchange: string;
+  weight: number;
+  params: Record<string, unknown>;
+}
+
+export interface AlertBasket {
+  name: string;
+  type: string;
+  tags: string[];
+  items: AlertBasketItem[];
+}
+
+export interface AlertParams {
+  name: string;
+  type: AlertType;
+  lhs_exchange: string;
+  lhs_tradingsymbol: string;
+  lhs_attribute: string;
+  operator: AlertOperator;
+  rhs_type: AlertRhsType;
+  rhs_constant?: number | undefined;
+  rhs_exchange?: string | undefined;
+  rhs_tradingsymbol?: string | undefined;
+  rhs_attribute?: string | undefined;
+  /** Present only for `ato` alerts; placed as an order when the alert fires. */
+  basket?: AlertBasket | undefined;
+}
+
+/**
+ * Alert fields are plain form values — EXCEPT `basket`, which is a JSON-encoded
+ * string inside a form field, the same asymmetry as `serialiseGtt`. The right
+ * side is sent as either a constant or an instrument reference, never both.
+ */
+function serialiseAlert(params: AlertParams): Record<string, string | number | undefined> {
+  const form: Record<string, string | number | undefined> = {
+    name: params.name,
+    type: params.type,
+    lhs_exchange: params.lhs_exchange,
+    lhs_tradingsymbol: params.lhs_tradingsymbol,
+    lhs_attribute: params.lhs_attribute,
+    operator: params.operator,
+    rhs_type: params.rhs_type,
+  };
+
+  if (params.rhs_type === 'constant') {
+    form.rhs_constant = params.rhs_constant;
+  } else {
+    form.rhs_exchange = params.rhs_exchange;
+    form.rhs_tradingsymbol = params.rhs_tradingsymbol;
+    form.rhs_attribute = params.rhs_attribute;
+  }
+
+  if (params.basket) {
+    form.basket = JSON.stringify(params.basket);
+  }
+  return form;
 }
 
 // ---------------------------------------------------------------------------

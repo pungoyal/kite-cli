@@ -8,6 +8,19 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **Price alerts (`kite alerts`).** Create, list, inspect, modify and delete Kite
+  price alerts. `list`, `get` and `history` read your alerts; `create` and `modify`
+  set the condition (`--operator` accepts `>=`/`<=`/`>`/`<`/`==` or aliases like
+  `above`/`below`, and `--value` a constant or `--rhs-instrument` another
+  instrument). `delete` takes one or more UUIDs.
+  - **Simple** alerts only notify — they move no money, so the kill switch and
+    value cap do not apply.
+  - **ATO** (Alert-Triggers-Order) alerts place a real order when they fire.
+    Creating one (`--type ato` with the order flags) goes through the same
+    confirmation, value cap and kill switch as `orders place`.
+
 ## [0.2.0] - 2026-07-21
 
 ### Added

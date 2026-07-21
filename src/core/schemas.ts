@@ -384,6 +384,68 @@ export type Gtt = z.infer<typeof GttSchema>;
 export const GttCreateResultSchema = z.looseObject({ trigger_id: z.number() });
 
 // ---------------------------------------------------------------------------
+// Alerts
+// ---------------------------------------------------------------------------
+
+/**
+ * An ATO (Alert-Triggers-Order) alert carries a basket — a full order spec that
+ * is placed when the alert fires. Every field is optional and the object is
+ * loose: we only *read* baskets on existing alerts, and Kite's basket shape is
+ * richer than we display, so anything we don't touch must pass through
+ * untouched rather than fail parsing (invariant #5).
+ */
+export const AlertBasketItemSchema = z.looseObject({
+  type: z.string().optional(),
+  tradingsymbol: z.string().optional(),
+  exchange: z.string().optional(),
+  instrument_token: z.number().optional(),
+  weight: z.number().optional(),
+  params: z.looseObject({}).optional(),
+});
+
+export const AlertBasketSchema = z.looseObject({
+  name: z.string().optional(),
+  type: z.string().optional(),
+  tags: z.array(z.unknown()).optional(),
+  items: z.array(AlertBasketItemSchema).default([]),
+});
+
+export const AlertSchema = z.looseObject({
+  uuid: z.string(),
+  user_id: z.string().optional(),
+  type: z.string(),
+  name: z.string().optional(),
+  status: z.string(),
+  disabled_reason: z.string().optional(),
+  lhs_attribute: z.string().optional(),
+  lhs_exchange: z.string().optional(),
+  lhs_tradingsymbol: z.string().optional(),
+  operator: z.string().optional(),
+  rhs_type: z.string().optional(),
+  rhs_attribute: z.string().optional(),
+  rhs_exchange: z.string().optional(),
+  rhs_tradingsymbol: z.string().optional(),
+  rhs_constant: z.number().optional(),
+  alert_count: z.number().optional(),
+  basket: AlertBasketSchema.optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+export type Alert = z.infer<typeof AlertSchema>;
+
+/** One entry in an alert's trigger history. `meta`/`order_meta` are large and
+ * only shown verbatim in `--json`, so they pass through unvalidated. */
+export const AlertHistoryEntrySchema = z.looseObject({
+  uuid: z.string().optional(),
+  type: z.string().optional(),
+  condition: z.string().optional(),
+  created_at: z.string().optional(),
+  meta: z.unknown().optional(),
+  order_meta: z.unknown().nullish(),
+});
+export type AlertHistoryEntry = z.infer<typeof AlertHistoryEntrySchema>;
+
+// ---------------------------------------------------------------------------
 // Margins / charges calculator
 // ---------------------------------------------------------------------------
 

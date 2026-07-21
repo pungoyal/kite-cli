@@ -92,6 +92,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
   const { marketCommands } = await import('./commands/market.js');
   const { orderCommands } = await import('./commands/orders.js');
   const { gttCommands } = await import('./commands/gtt.js');
+  const { alertCommands } = await import('./commands/alerts.js');
   const { watchCommands } = await import('./commands/watch.js');
   const { configCommands } = await import('./commands/config.js');
 
@@ -111,6 +112,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
   program.commandsGroup('Trading:');
   orderCommands(program, withContext);
   gttCommands(program, withContext);
+  alertCommands(program, withContext);
 
   program.commandsGroup('Streaming:');
   watchCommands(program, withContext);

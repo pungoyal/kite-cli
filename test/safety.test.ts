@@ -774,3 +774,130 @@ describe('sandbox guard rails', () => {
     expect(err).toMatch(/sandbox does not accept MARKET/i);
   });
 });
+
+describe('alerts safety', () => {
+  const pool = () => agent.get('https://api.kite.trade');
+
+  it('creates a simple alert even with the trading kill switch off — no order moves', async () => {
+    // A simple price alert places no order, so the kill switch must not block it.
+    await seedSession({ trading: { enabled: false } });
+    pool()
+      .intercept({ path: '/alerts', method: 'POST' })
+      .reply(200, { status: 'success', data: { uuid: 'u1', type: 'simple', status: 'enabled' } });
+
+    const code = await invoke([
+      'alerts',
+      'create',
+      'INDICES:NIFTY 50',
+      '-o',
+      'above',
+      '--value',
+      '27000',
+      '--yes',
+      '--json',
+    ]);
+    expect(code).toBe(ExitCode.Ok);
+    expect(JSON.parse(out).uuid).toBe('u1');
+  });
+
+  it('normalises operator aliases and sends the raw symbol to Kite', async () => {
+    await seedSession();
+    let body = '';
+    pool()
+      .intercept({ path: '/alerts', method: 'POST' })
+      .reply((opts) => {
+        body = String(opts.body);
+        return {
+          statusCode: 200,
+          data: { status: 'success', data: { uuid: 'u2', type: 'simple', status: 'enabled' } },
+        };
+      });
+
+    const code = await invoke(['alerts', 'create', 'NSE:INFY', '-o', 'below', '--value', '1400', '--yes']);
+    expect(code).toBe(ExitCode.Ok);
+    expect(new URLSearchParams(body).get('operator')).toBe('<=');
+  });
+
+  it('blocks an ATO alert when the kill switch is off — it places a real order', async () => {
+    await seedSession({ trading: { enabled: false } });
+    // No POST /alerts interceptor: reaching the network would throw, so a clean
+    // TradingDisabled exit proves nothing was sent.
+    const code = await invoke([
+      'alerts',
+      'create',
+      'NSE:INFY',
+      '-o',
+      'above',
+      '--value',
+      '1600',
+      '--type',
+      'ato',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--order-type',
+      'LIMIT',
+      '--price',
+      '1600',
+      '--yes',
+    ]);
+    expect(code).toBe(ExitCode.TradingDisabled);
+    expect(err).toMatch(/kill switch/i);
+  });
+
+  it('applies the value cap to an ATO order', async () => {
+    await seedSession({ trading: { enabled: true, maxOrderValue: 5000 } });
+    const code = await invoke([
+      'alerts',
+      'create',
+      'NSE:INFY',
+      '-o',
+      'above',
+      '--value',
+      '1600',
+      '--type',
+      'ato',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--order-type',
+      'LIMIT',
+      '--price',
+      '1600',
+      '--yes',
+    ]);
+    // 10 × 1600 = 16,000 > 5,000 cap.
+    expect(code).toBe(ExitCode.TradingDisabled);
+    expect(err).toMatch(/exceeds/i);
+  });
+
+  it('previews an ATO alert with --dry-run without sending it', async () => {
+    await seedSession({ trading: { enabled: true } });
+    const code = await invoke([
+      'alerts',
+      'create',
+      'NSE:INFY',
+      '-o',
+      'above',
+      '--value',
+      '1600',
+      '--type',
+      'ato',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--order-type',
+      'LIMIT',
+      '--price',
+      '1600',
+      '--dry-run',
+    ]);
+    expect(code).toBe(ExitCode.Ok);
+    expect(err).toMatch(/dry run/i);
+    // The preview shows the resolved order value: 10 × 1600 = 16,000.
+    expect(err).toMatch(/16,000/);
+  });
+});
