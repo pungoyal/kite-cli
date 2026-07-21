@@ -1,11 +1,20 @@
 name: Docs
 
-# Builds the VitePress documentation site (docs/) and deploys it to GitHub
-# Pages. The site is an isolated workspace with its own package.json and
+# Builds the VitePress documentation site (docs/) and, on main, deploys it to
+# GitHub Pages. The site is an isolated workspace with its own package.json and
 # lockfile, so it never touches the CLI package's dependency closure.
+#
+# On pull requests the build runs as a validation gate only — `vitepress build`
+# fails on a broken build or a dead internal link (ignoreDeadLinks is off), so
+# regressions are caught before merge. The Pages upload/deploy steps run only on
+# a push to main, where the deployment context and permissions exist.
 on:
   push:
     branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
@@ -15,9 +24,10 @@ on:
 permissions:
   contents: read
 
-# Allow one concurrent deployment; a newer push supersedes an in-flight one.
+# Serialise real deployments (one Pages group per ref) without letting a PR
+# build block main's deploy or vice versa.
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -44,18 +54,26 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: docs
 
+      # The validation gate: fails the check on a broken build or dead link,
+      # on pull requests as well as on main.
       - name: Build
         run: npm run build
         working-directory: docs
 
+      # Pages plumbing is only meaningful on a real deployment, so skip it on
+      # pull requests (which also lack the Pages context/permissions).
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        if: github.event_name != 'pull_request'
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.event_name != 'pull_request'
         with:
           path: docs/.vitepress/dist
 
   deploy:
     name: Deploy to Pages
+    # No deploy on pull requests — the build job above is the PR gate.
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:
