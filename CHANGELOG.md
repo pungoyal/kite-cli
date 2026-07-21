@@ -8,6 +8,16 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- A `docs/` directory: a safety-model deep dive, a full configuration
+  reference, a troubleshooting guide, a generated CLI command reference
+  (`npm run docs:commands`, checked in CI), and a library API reference.
+- A documentation site published to
+  [pungoyal.github.io/kite-cli](https://pungoyal.github.io/kite-cli/), built
+  from `docs/` with VitePress and deployed to GitHub Pages. The site is an
+  isolated workspace, so it adds nothing to the installed CLI package.
+
 ## [0.2.0] - 2026-07-21
 
 ### Added
