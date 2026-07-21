@@ -1,0 +1,45 @@
+# Automated dependency updates.
+#
+# Chosen over Renovate deliberately: Dependabot is GitHub-native and needs no
+# third-party app installed on the repo, which fits this project's "small,
+# audited surface" posture. Every PR it opens runs the full CI matrix, so the
+# `check:deps` budget gate rejects any update that would grow the production
+# dependency closure past its limit.
+version: 2
+updates:
+  # npm dependencies.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # Don't jump on a release the day it lands — mirrors `.npmrc` min-release-age.
+    cooldown:
+      default-days: 5
+    commit-message:
+      prefix: deps
+      prefix-development: deps-dev
+    groups:
+      # Fold routine dev-dependency bumps into a single PR to cut noise; runtime
+      # dependencies and any major bump still get their own reviewable PR.
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions are pinned to commit SHAs; Dependabot keeps them current
+  # while preserving the pin (it bumps the SHA and updates the version comment).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns:
+          - '*'

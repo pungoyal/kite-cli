@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/pungoyal/kite-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/pungoyal/kite-cli/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@pungoyal/kite-cli.svg)](https://www.npmjs.com/package/@pungoyal/kite-cli)
+[![Release](https://img.shields.io/github/v/release/pungoyal/kite-cli?sort=semver&color=blue)](https://github.com/pungoyal/kite-cli/releases/latest)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A5%2022.12-brightgreen.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
