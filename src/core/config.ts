@@ -15,33 +15,73 @@ import { configDir, configFile, ensurePrivateDir } from './paths.js';
 export const EnvironmentSchema = z.enum(['production', 'sandbox']);
 export type Environment = z.infer<typeof EnvironmentSchema>;
 
+export const TradingSchema = z.object({
+  /**
+   * Local kill switch. When false, every order-placing, order-modifying and
+   * GTT-mutating command refuses before touching the network.
+   */
+  enabled: z.boolean().default(true),
+  /** Require an interactive confirmation before any money-moving action. */
+  confirm: z.boolean().default(true),
+  /**
+   * Refuse any single order whose notional value exceeds this (rupees).
+   * Undefined means no cap.
+   */
+  maxOrderValue: z.number().positive().optional(),
+  /**
+   * Above this notional value, require typing a literal token to confirm
+   * rather than a single keystroke.
+   */
+  strictConfirmAbove: z.number().positive().default(100_000),
+});
+export type TradingConfig = z.infer<typeof TradingSchema>;
+
+/**
+ * Per-profile trading overrides. Every field is optional with NO default:
+ * an absent field means "inherit the global setting", never "no limit". That
+ * inheritance is deliberately fail-closed — a profile that omits a cap must
+ * still be bound by the global cap, or the one guard the user configured would
+ * silently stop applying to their other accounts.
+ */
+export const ProfileTradingSchema = z.object({
+  enabled: z.boolean().optional(),
+  confirm: z.boolean().optional(),
+  maxOrderValue: z.number().positive().optional(),
+  strictConfirmAbove: z.number().positive().optional(),
+});
+export type ProfileTradingOverrides = z.infer<typeof ProfileTradingSchema>;
+
+/**
+ * A named account. Each real Zerodha account has its own Kite Connect app, so a
+ * profile carries its own (semi-public) api key and env; its api secret and
+ * access token live in the keyring / encrypted file, namespaced by profile.
+ */
+export const ProfileConfigSchema = z.object({
+  apiKey: z.string().min(1).optional(),
+  env: EnvironmentSchema.optional(),
+  trading: ProfileTradingSchema.optional(),
+});
+export type ProfileConfig = z.infer<typeof ProfileConfigSchema>;
+
 export const ConfigSchema = z.object({
   /** Kite Connect API key. Semi-public (it appears in login URLs), so not a keyring secret. */
   apiKey: z.string().min(1).optional(),
 
   env: EnvironmentSchema.default('production'),
 
-  trading: z
-    .object({
-      /**
-       * Local kill switch. When false, every order-placing, order-modifying and
-       * GTT-mutating command refuses before touching the network.
-       */
-      enabled: z.boolean().default(true),
-      /** Require an interactive confirmation before any money-moving action. */
-      confirm: z.boolean().default(true),
-      /**
-       * Refuse any single order whose notional value exceeds this (rupees).
-       * Undefined means no cap.
-       */
-      maxOrderValue: z.number().positive().optional(),
-      /**
-       * Above this notional value, require typing a literal token to confirm
-       * rather than a single keystroke.
-       */
-      strictConfirmAbove: z.number().positive().default(100_000),
-    })
-    .prefault({}),
+  trading: TradingSchema.prefault({}),
+
+  /**
+   * The profile used when none is named on the command line or in KITE_PROFILE.
+   * Absent means the reserved `default` profile (top-level apiKey/env above).
+   */
+  defaultProfile: z.string().min(1).optional(),
+
+  /**
+   * Named accounts beyond `default`. The `default` and `sandbox` profiles are
+   * reserved and synthesised, so they never need an entry here.
+   */
+  profiles: z.record(z.string(), ProfileConfigSchema).default({}),
 
   output: z
     .object({

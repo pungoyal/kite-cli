@@ -17,6 +17,8 @@ export const SessionMetaSchema = z.object({
   broker: z.string().optional(),
   env: z.string(),
   apiKey: z.string(),
+  /** The profile this session belongs to. Optional so pre-profile files parse. */
+  profile: z.string().optional(),
   /** ISO 8601. Kite invalidates all tokens at 06:00 IST daily. */
   expiresAt: z.string(),
   loginTime: z.string().optional(),
@@ -26,10 +28,10 @@ export const SessionMetaSchema = z.object({
 
 export type SessionMeta = z.infer<typeof SessionMetaSchema>;
 
-export async function loadSessionMeta(): Promise<SessionMeta | null> {
+export async function loadSessionMeta(profile = 'default'): Promise<SessionMeta | null> {
   let raw: string;
   try {
-    raw = await readFile(sessionFile(), 'utf8');
+    raw = await readFile(sessionFile(profile), 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw err;
@@ -44,7 +46,7 @@ export async function loadSessionMeta(): Promise<SessionMeta | null> {
 
 export async function saveSessionMeta(meta: SessionMeta): Promise<void> {
   await ensurePrivateDir(configDir());
-  const path = sessionFile();
+  const path = sessionFile(meta.profile ?? 'default');
   await writeFile(path, `${JSON.stringify(meta, null, 2)}\n`, {
     mode: 0o600,
     encoding: 'utf8',
@@ -54,9 +56,9 @@ export async function saveSessionMeta(meta: SessionMeta): Promise<void> {
   }
 }
 
-export async function clearSessionMeta(): Promise<void> {
+export async function clearSessionMeta(profile = 'default'): Promise<void> {
   try {
-    await unlink(sessionFile());
+    await unlink(sessionFile(profile));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }

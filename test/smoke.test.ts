@@ -109,7 +109,8 @@ describe('stream discipline', () => {
   it('keeps notes on stderr and data on stdout', async () => {
     const result = await kite(['whoami', '--json']);
     // Not logged in: the JSON document still belongs on stdout...
-    expect(result.stdout.trim()).toBe('{"logged_in":false}');
+    const doc = JSON.parse(result.stdout);
+    expect(doc.logged_in).toBe(false);
     // ...and the exit code communicates the failure.
     expect(result.exitCode).toBe(3);
   });

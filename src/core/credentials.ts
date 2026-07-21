@@ -115,13 +115,20 @@ function filePassphrase(): string | null {
   return value && value !== '' ? value : null;
 }
 
-/** Namespaced account key, so sandbox and production sessions coexist. */
-function accountKey(name: SecretName, env: string): string {
-  return env === 'production' ? name : `${env}:${name}`;
+/**
+ * Name the keyring entry / file key for a secret by prepending the profile's
+ * storage prefix. The prefix ('' for default, 'sandbox:', 'profile:<name>:') is
+ * computed by `storagePrefixFor` in profiles.ts and passed in, so this module
+ * stays unaware of the profile model — and the default profile keeps the exact
+ * unprefixed keys the single-account CLI has always written.
+ */
+function scopedKey(name: SecretName, scope: string): string {
+  return `${scope}${name}`;
 }
 
 export interface CredentialStoreOptions {
-  env: string;
+  /** Profile storage prefix, e.g. '' (default), 'sandbox:', 'profile:<name>:'. */
+  scope: string;
   /** Passphrase for the file backend when the keyring is unavailable. */
   passphrase?: string | undefined;
 }
@@ -140,7 +147,7 @@ export async function getSecret(name: SecretName, opts: CredentialStoreOptions):
     return { value: fromEnv, backend: 'env' };
   }
 
-  const account = accountKey(name, opts.env);
+  const account = scopedKey(name, opts.scope);
 
   const fromKeyring = await keyringGet(account);
   if (fromKeyring) {
@@ -163,7 +170,7 @@ export async function getSecret(name: SecretName, opts: CredentialStoreOptions):
 
 export async function setSecret(name: SecretName, value: string, opts: CredentialStoreOptions): Promise<Backend> {
   registerSecret(value);
-  const account = accountKey(name, opts.env);
+  const account = scopedKey(name, opts.scope);
 
   if (await keyringSet(account, value)) {
     return 'keyring';
@@ -185,7 +192,7 @@ export async function setSecret(name: SecretName, value: string, opts: Credentia
 }
 
 export async function deleteSecret(name: SecretName, opts: CredentialStoreOptions): Promise<void> {
-  const account = accountKey(name, opts.env);
+  const account = scopedKey(name, opts.scope);
   await keyringDelete(account);
 
   const passphrase = opts.passphrase ?? filePassphrase();
@@ -202,7 +209,7 @@ export async function deleteSecret(name: SecretName, opts: CredentialStoreOption
   }
 }
 
-/** Remove every stored secret for an environment. Used by `kite logout --all`. */
+/** Remove every stored secret for a profile. Used by `kite logout --all`. */
 export async function deleteAllSecrets(opts: CredentialStoreOptions): Promise<void> {
   await deleteSecret('access_token', opts);
   await deleteSecret('api_secret', opts);

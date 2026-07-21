@@ -6,12 +6,12 @@ import {
   type Environment,
   endpointsFor,
   loadConfig,
-  resolveEnv,
   SANDBOX_CREDENTIALS,
 } from './core/config.js';
 import { getSecret } from './core/credentials.js';
 import { AuthRequiredError, ExitCode, KiteCliError } from './core/errors.js';
 import { InstrumentStore } from './core/instruments.js';
+import { type ResolvedProfile, resolveProfile, resolveTradingConfig, storagePrefixFor } from './core/profiles.js';
 import { RateLimiter } from './core/ratelimit.js';
 import { registerSecret } from './core/redact.js';
 import { isExpired, loadSessionMeta, type SessionMeta } from './core/session.js';
@@ -32,6 +32,7 @@ export interface GlobalOptions {
   quiet?: boolean;
   debug?: boolean;
   env?: string;
+  profile?: string;
   yes?: boolean;
   dryRun?: boolean;
 }
@@ -40,6 +41,10 @@ export interface Context {
   io: Io;
   config: Config;
   env: Environment;
+  /** The account this invocation targets. */
+  profile: ResolvedProfile;
+  /** Keyring / file namespace prefix for this profile's secrets. */
+  credentialScope: string;
   endpoints: Endpoints;
   client: KiteClient;
   api: KiteApi;
@@ -58,9 +63,15 @@ export async function createContext(
   signal: AbortSignal,
   streams?: IoStreams,
 ): Promise<Context> {
-  const config = await loadConfig();
-  const env = resolveEnv(options.env, config);
+  const loaded = await loadConfig();
+  const profile = resolveProfile({ profileFlag: options.profile, envFlag: options.env }, loaded);
+  const env = profile.env;
   const endpoints = endpointsFor(env);
+  const credentialScope = storagePrefixFor(profile);
+
+  // The trading config actually in force: global settings overlaid with this
+  // profile's overrides (fail-closed — an omitted cap inherits the global one).
+  const config: Config = { ...loaded, trading: resolveTradingConfig(loaded, profile) };
 
   const io = new Io({
     json: options.json ?? false,
@@ -72,10 +83,23 @@ export async function createContext(
     ...(streams ? { streams } : {}),
   });
 
-  const apiKey = resolveApiKey(config, env);
+  // Fail closed on an ambiguous account. When the caller named a profile
+  // explicitly, an ambient KITE_ACCESS_TOKEN / KITE_API_SECRET meant for some
+  // other account must not silently stand in for it — that is the wrong-account
+  // footgun this feature exists to prevent. The CI escape hatch is preserved
+  // for the default / configured profile, which is not "explicit".
+  if (profile.explicit && (process.env['KITE_ACCESS_TOKEN'] || process.env['KITE_API_SECRET'])) {
+    throw new KiteCliError(
+      `Profile "${profile.name}" was named explicitly, but KITE_ACCESS_TOKEN or KITE_API_SECRET is set in the environment and would override it.`,
+      ExitCode.Usage,
+      "Unset those variables to use the profile's own stored credentials, or drop --profile/KITE_PROFILE to use the environment ones.",
+    );
+  }
 
-  const session = await loadSessionMeta();
-  const accessToken = await resolveAccessToken(env, session, apiKey, io);
+  const apiKey = resolveApiKey(profile);
+
+  const session = await loadSessionMeta(profile.name);
+  const accessToken = await resolveAccessToken(env, session, apiKey, io, credentialScope);
 
   const client = new KiteClient({
     apiKey,
@@ -91,8 +115,15 @@ export async function createContext(
 
   const requireSession = (): SessionMeta => {
     if (!client.hasSession()) {
+      if (profile.name !== 'default') {
+        throw new AuthRequiredError(
+          `Not logged in to profile "${profile.name}".`,
+          `Run \`kite --profile ${profile.name} login\`.`,
+        );
+      }
       throw new AuthRequiredError(
-        env === 'sandbox' ? 'No sandbox session. Run `kite login --env sandbox`.' : 'Not logged in.',
+        env === 'sandbox' ? 'No sandbox session.' : 'Not logged in.',
+        env === 'sandbox' ? 'Run `kite login --env sandbox`.' : 'Run `kite login` to start a session.',
       );
     }
     // A session file is absent when credentials came from the environment,
@@ -102,6 +133,7 @@ export async function createContext(
         userId: 'unknown',
         env,
         apiKey,
+        profile: profile.name,
         expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
         exchanges: [],
         products: [],
@@ -112,7 +144,7 @@ export async function createContext(
 
   const requireApiSecret = async (): Promise<string> => {
     if (env === 'sandbox') return SANDBOX_CREDENTIALS.apiSecret;
-    const found = await getSecret('api_secret', { env });
+    const found = await getSecret('api_secret', { scope: credentialScope });
     if (!found) {
       throw new KiteCliError(
         'No API secret is stored.',
@@ -127,6 +159,8 @@ export async function createContext(
     io,
     config,
     env,
+    profile,
+    credentialScope,
     endpoints,
     client,
     api,
@@ -139,14 +173,14 @@ export async function createContext(
   };
 }
 
-function resolveApiKey(config: Config, env: Environment): string {
+function resolveApiKey(profile: ResolvedProfile): string {
   const fromEnv = process.env['KITE_API_KEY'];
   if (fromEnv && fromEnv.trim() !== '') return fromEnv;
-  if (env === 'sandbox') return SANDBOX_CREDENTIALS.apiKey;
-  if (config.apiKey) return config.apiKey;
-  // Deliberately not fatal here: `kite login` sets this up, and `kite config`
-  // must remain usable before it exists.
-  return '';
+  // The profile already carries the right key: the sandbox constant, the
+  // default profile's config.apiKey, or a named profile's stored key. Empty is
+  // fine and non-fatal — `kite login` sets it up, and `kite config` must work
+  // before it exists.
+  return profile.apiKey;
 }
 
 async function resolveAccessToken(
@@ -154,10 +188,11 @@ async function resolveAccessToken(
   session: SessionMeta | null,
   apiKey: string,
   io: Io,
+  scope: string,
 ): Promise<string | undefined> {
   let found: Awaited<ReturnType<typeof getSecret>>;
   try {
-    found = await getSecret('access_token', { env });
+    found = await getSecret('access_token', { scope });
   } catch (err) {
     // A corrupt or wrong-passphrase credential file must not brick the CLI.
     // This runs during context construction for EVERY command, so throwing

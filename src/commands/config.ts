@@ -39,14 +39,18 @@ async function showConfig(ctx: Context): Promise<void> {
     return;
   }
 
-  const secret = await getSecret('api_secret', { env: ctx.env });
+  const secret = await getSecret('api_secret', { scope: ctx.credentialScope });
+  // Effective trading config for the active profile (global overlaid with the
+  // profile's overrides), so this view matches what a money-moving command sees.
+  const trading = ctx.config.trading;
 
   io.line(heading(io, 'Account'));
   io.line(
     renderKeyValue(io, [
-      ['API key', config.apiKey ?? io.dim('not set')],
+      ['Profile', ctx.profile.name === 'default' ? ctx.profile.name : io.bold(ctx.profile.name)],
+      ['API key', ctx.profile.apiKey || io.dim('not set')],
       ['API secret', secret ? `${maskSecret(secret.value)} (${secret.backend})` : io.dim('not set')],
-      ['Environment', config.env === 'sandbox' ? io.cyan('sandbox') : 'production'],
+      ['Environment', ctx.profile.env === 'sandbox' ? io.cyan('sandbox') : 'production'],
       [
         'Keyring',
         (await keyringAvailable()) ? io.green('available') : io.yellow('unavailable — using an encrypted file'),
@@ -57,12 +61,19 @@ async function showConfig(ctx: Context): Promise<void> {
   io.line(heading(io, 'Trading safety'));
   io.line(
     renderKeyValue(io, [
-      ['Trading enabled', config.trading.enabled ? io.green('yes') : io.red('no — all order commands will refuse')],
-      ['Confirm orders', config.trading.confirm ? 'yes' : io.yellow('no')],
-      ['Max order value', config.trading.maxOrderValue ? rupees(config.trading.maxOrderValue) : io.dim('no cap')],
-      ['Strict confirm above', rupees(config.trading.strictConfirmAbove)],
+      ['Trading enabled', trading.enabled ? io.green('yes') : io.red('no — all order commands will refuse')],
+      ['Confirm orders', trading.confirm ? 'yes' : io.yellow('no')],
+      ['Max order value', trading.maxOrderValue ? rupees(trading.maxOrderValue) : io.dim('no cap')],
+      ['Strict confirm above', rupees(trading.strictConfirmAbove)],
     ]),
   );
+
+  const others = Object.keys(config.profiles);
+  if (others.length > 0) {
+    io.line(heading(io, 'Profiles'));
+    io.line(renderKeyValue(io, [['Configured', ['default', 'sandbox', ...others].join(', ')]]));
+    io.note(io.dim('  Manage them with `kite profiles`.'));
+  }
 
   io.line(heading(io, 'Login callback'));
   io.line(
@@ -104,7 +115,22 @@ async function setConfig(ctx: Context, _opts: unknown, command: { args: string[]
   const config = await loadConfig();
   const coerced = coerce(rawValue, SETTABLE_KEYS[key].type, key);
   const updated = structuredClone(config) as Record<string, unknown>;
-  writePath(updated, key, coerced);
+
+  const target = ctx.profile.name;
+  if (target === 'default') {
+    writePath(updated, key, coerced);
+  } else {
+    // Only account- and trading-scoped keys make sense per profile; global
+    // presentation/callback settings would be silently ignored, so refuse them.
+    if (!isProfileScopedKey(key)) {
+      throw new UsageError(`"${key}" is a global setting.`, 'Drop --profile to set it globally.');
+    }
+    const profiles = (updated.profiles ?? {}) as Record<string, Record<string, unknown>>;
+    updated.profiles = profiles;
+    const entry = (profiles[target] ?? {}) as Record<string, unknown>;
+    profiles[target] = entry;
+    writePath(entry, key, coerced);
+  }
 
   const parsed = ConfigSchema.safeParse(updated);
   if (!parsed.success) {
@@ -115,10 +141,11 @@ async function setConfig(ctx: Context, _opts: unknown, command: { args: string[]
   await saveConfig(parsed.data);
 
   if (ctx.io.json) {
-    ctx.io.writeJson({ key, value: coerced });
+    ctx.io.writeJson({ key, value: coerced, profile: target });
     return;
   }
-  ctx.io.success(`Set ${ctx.io.bold(key)} to ${JSON.stringify(coerced)}.`);
+  const onProfile = target === 'default' ? '' : ` on profile ${ctx.io.bold(target)}`;
+  ctx.io.success(`Set ${ctx.io.bold(key)} to ${JSON.stringify(coerced)}${onProfile}.`);
 
   if (key === 'trading.enabled' && coerced === false) {
     ctx.io.info('The kill switch is on. All order commands will now refuse before contacting Kite.');
@@ -138,7 +165,18 @@ async function unsetConfig(ctx: Context, _opts: unknown, command: { args: string
 
   const config = await loadConfig();
   const updated = structuredClone(config) as Record<string, unknown>;
-  deletePath(updated, key);
+
+  const target = ctx.profile.name;
+  if (target === 'default') {
+    deletePath(updated, key);
+  } else {
+    if (!isProfileScopedKey(key)) {
+      throw new UsageError(`"${key}" is a global setting.`, 'Drop --profile to unset it globally.');
+    }
+    const profiles = (updated.profiles ?? {}) as Record<string, Record<string, unknown>>;
+    const entry = profiles[target];
+    if (entry) deletePath(entry, key);
+  }
 
   const parsed = ConfigSchema.safeParse(updated);
   if (!parsed.success) {
@@ -148,10 +186,11 @@ async function unsetConfig(ctx: Context, _opts: unknown, command: { args: string
 
   await saveConfig(parsed.data);
   if (ctx.io.json) {
-    ctx.io.writeJson({ key, unset: true });
+    ctx.io.writeJson({ key, unset: true, profile: target });
     return;
   }
-  ctx.io.success(`Unset ${ctx.io.bold(key)}.`);
+  const onProfile = target === 'default' ? '' : ` on profile ${ctx.io.bold(target)}`;
+  ctx.io.success(`Unset ${ctx.io.bold(key)}${onProfile}.`);
 }
 
 async function showPaths(ctx: Context): Promise<void> {
@@ -178,6 +217,11 @@ async function showPaths(ctx: Context): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+
+/** Keys that mean something per profile; the rest are global (output, callback). */
+function isProfileScopedKey(key: string): boolean {
+  return key === 'apiKey' || key === 'env' || key.startsWith('trading.');
+}
 
 /** Coerce an argv string to the type the setting declares. */
 function coerce(raw: string, type: 'string' | 'number' | 'boolean', key: string): unknown {

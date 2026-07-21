@@ -720,6 +720,52 @@ describe('--json mode', () => {
   });
 });
 
+describe('multi-account safety', () => {
+  it('names the verified account in the order preview', async () => {
+    await seedSession();
+    agent
+      .get('https://api.kite.trade')
+      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
+      .reply(200, {
+        status: 'success',
+        data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+      });
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--dry-run',
+    ]);
+
+    expect(code).toBe(ExitCode.Ok);
+    // The preview must carry the verified user id, not just a label — this is
+    // the primary guard against placing an order on the wrong account.
+    expect(err).toMatch(/Account/);
+    expect(err).toMatch(/AB1234/);
+  });
+
+  it('fails closed when an explicit --profile collides with an ambient token', async () => {
+    // seedSession sets KITE_ACCESS_TOKEN for the default account. Naming a
+    // different profile explicitly must not silently reuse that token.
+    await seedSession();
+
+    const code = await invoke(['--profile', 'spouse', 'holdings']);
+
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).toMatch(/KITE_ACCESS_TOKEN|KITE_API_SECRET/);
+    expect(err).toMatch(/spouse/);
+  });
+});
+
 describe('sandbox guard rails', () => {
   it('rejects MARKET orders, which the sandbox does not accept', async () => {
     await seedSession({ env: 'sandbox' });

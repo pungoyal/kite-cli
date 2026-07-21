@@ -8,9 +8,10 @@ import {
   redirectUrlFor,
   waitForCallback,
 } from '../core/auth.js';
-import { SANDBOX_CREDENTIALS, saveConfig } from '../core/config.js';
+import { type Environment, loadConfig, SANDBOX_CREDENTIALS, saveConfig } from '../core/config.js';
 import { deleteAllSecrets, getSecret, keyringAvailable, setSecret } from '../core/credentials.js';
 import { AbortedError, ExitCode, KiteCliError } from '../core/errors.js';
+import { getProfile, listProfileNames } from '../core/profiles.js';
 import { maskSecret, registerSecret } from '../core/redact.js';
 import {
   clearSessionMeta,
@@ -21,7 +22,7 @@ import {
   timeUntilExpiry,
 } from '../core/session.js';
 import { dateTime } from '../output/format.js';
-import { renderKeyValue } from '../output/table.js';
+import { printTable, renderKeyValue } from '../output/table.js';
 import type { CommandFactory } from './types.js';
 
 export const authCommands: CommandFactory = (program, run) => {
@@ -39,11 +40,16 @@ export const authCommands: CommandFactory = (program, run) => {
     .option('--all', 'Also remove the stored API secret')
     .action(run(logout));
 
-  program.command('whoami').description('Show the current session and account details').action(run(whoami));
+  program
+    .command('whoami')
+    .description('Show the current session and account details')
+    .option('--all', 'List every configured profile and its session status')
+    .action(run(whoami));
 };
 
 async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; force?: boolean }): Promise<void> {
   const { io } = ctx;
+  const profileName = ctx.profile.name;
 
   if (!opts.force && ctx.client.hasSession() && ctx.session && !isExpired(ctx.session)) {
     io.success(
@@ -55,9 +61,12 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
   }
 
   const isSandbox = ctx.env === 'sandbox';
+  if (profileName !== 'default' && !isSandbox) {
+    io.info(`Logging in to profile ${io.bold(profileName)}.`);
+  }
 
   // --- credentials -------------------------------------------------------
-  let apiKey = opts.apiKey ?? (isSandbox ? SANDBOX_CREDENTIALS.apiKey : (ctx.config.apiKey ?? ''));
+  let apiKey = opts.apiKey ?? (isSandbox ? SANDBOX_CREDENTIALS.apiKey : ctx.profile.apiKey);
   let apiSecret: string;
 
   if (isSandbox) {
@@ -69,7 +78,7 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
       apiKey = await promptText('Kite Connect API key', 'Create an app at https://developers.kite.trade to get one.');
     }
 
-    const stored = await getSecret('api_secret', { env: ctx.env });
+    const stored = await getSecret('api_secret', { scope: ctx.credentialScope });
     if (stored && !opts.force) {
       apiSecret = stored.value;
       io.info(`Using stored API secret (${maskSecret(apiSecret)}) from the ${stored.backend}.`);
@@ -115,10 +124,10 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
 
   // --- persist ------------------------------------------------------------
   const backend = await setSecret('access_token', session.access_token, {
-    env: ctx.env,
+    scope: ctx.credentialScope,
   });
   if (!isSandbox) {
-    await setSecret('api_secret', apiSecret, { env: ctx.env });
+    await setSecret('api_secret', apiSecret, { scope: ctx.credentialScope });
   }
 
   const expiresAt = nextTokenExpiry();
@@ -128,14 +137,18 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
     broker: session.broker,
     env: ctx.env,
     apiKey,
+    profile: profileName,
     expiresAt: expiresAt.toISOString(),
     loginTime: session.login_time,
     exchanges: session.exchanges,
     products: session.products,
   });
 
-  if (ctx.config.apiKey !== apiKey && !isSandbox) {
-    await saveConfig({ ...ctx.config, apiKey });
+  // Register the profile's api key so subsequent runs find it, and so a new
+  // named profile becomes discoverable in `kite profiles`. The sandbox uses the
+  // public constant, so there is nothing worth persisting for it.
+  if (!isSandbox) {
+    await persistProfileApiKey(profileName, ctx.env, apiKey);
   }
 
   if (io.json) {
@@ -143,13 +156,15 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
       user_id: session.user_id,
       user_name: session.user_name,
       env: ctx.env,
+      profile: profileName,
       expires_at: expiresAt.toISOString(),
       storage: backend,
     });
     return;
   }
 
-  io.success(`Logged in as ${io.bold(session.user_name ?? session.user_id)}.`);
+  const asProfile = profileName === 'default' ? '' : ` on profile ${io.bold(profileName)}`;
+  io.success(`Logged in as ${io.bold(session.user_name ?? session.user_id)}${asProfile}.`);
   io.info(`Session expires ${dateTime(expiresAt)} IST (Kite invalidates all tokens at 6 AM daily).`);
   io.info(
     backend === 'keyring'
@@ -210,12 +225,13 @@ function extractState(loginUrl: string): string {
 
 async function logout(ctx: Context, opts: { all?: boolean }): Promise<void> {
   const { io } = ctx;
+  const profileName = ctx.profile.name;
 
   // Best-effort server-side invalidation; a failure here must not stop us
   // clearing local state, or the user is stuck with credentials they cannot
   // remove.
   if (ctx.client.hasSession()) {
-    const stored = await getSecret('access_token', { env: ctx.env });
+    const stored = await getSecret('access_token', { scope: ctx.credentialScope });
     if (stored) {
       try {
         await ctx.api.invalidateSession(stored.value);
@@ -228,59 +244,73 @@ async function logout(ctx: Context, opts: { all?: boolean }): Promise<void> {
 
   const { deleteSecret } = await import('../core/credentials.js');
   if (opts.all) {
-    await deleteAllSecrets({ env: ctx.env });
+    await deleteAllSecrets({ scope: ctx.credentialScope });
   } else {
-    await deleteSecret('access_token', { env: ctx.env });
+    await deleteSecret('access_token', { scope: ctx.credentialScope });
   }
-  await clearSessionMeta();
+  await clearSessionMeta(profileName);
+
+  const onProfile = profileName === 'default' ? '' : ` (profile ${io.bold(profileName)})`;
 
   if (io.json) {
-    io.writeJson({ logged_out: true, removed_api_secret: Boolean(opts.all) });
+    io.writeJson({ logged_out: true, profile: profileName, removed_api_secret: Boolean(opts.all) });
     return;
   }
 
-  io.success(opts.all ? 'Logged out and removed the stored API secret.' : 'Logged out.');
+  io.success(opts.all ? `Logged out and removed the stored API secret${onProfile}.` : `Logged out${onProfile}.`);
   if (!opts.all) io.info('Your API secret is still stored. Use `kite logout --all` to remove it.');
 }
 
-async function whoami(ctx: Context): Promise<void> {
+async function whoami(ctx: Context, opts: { all?: boolean }): Promise<void> {
+  if (opts.all) {
+    await whoamiAll(ctx);
+    return;
+  }
+
   const { io } = ctx;
-  const meta = await loadSessionMeta();
+  const profileName = ctx.profile.name;
+  const meta = await loadSessionMeta(profileName);
 
   if (!ctx.client.hasSession()) {
     // Exit non-zero in both modes: a script checking `kite whoami` must be able
     // to branch on the exit code, not parse stdout.
     process.exitCode = ExitCode.Auth;
     if (io.json) {
-      io.writeJson({ logged_in: false });
+      io.writeJson({ logged_in: false, profile: profileName });
       return;
     }
-    io.error('Not logged in.');
-    io.info('Run `kite login` to start a session.');
+    io.error(profileName === 'default' ? 'Not logged in.' : `Not logged in to profile "${profileName}".`);
+    io.info(
+      profileName === 'default'
+        ? 'Run `kite login` to start a session.'
+        : `Run \`kite --profile ${profileName} login\`.`,
+    );
     return;
   }
 
   // Hit the API so this reflects reality, not just what we cached.
-  const profile = await ctx.api.getProfile(ctx.signal);
+  const account = await ctx.api.getProfile(ctx.signal);
 
   if (io.json) {
     io.writeJson({
       logged_in: true,
       env: ctx.env,
+      profile: profileName,
       expires_at: meta?.expiresAt,
-      profile,
+      account,
     });
     return;
   }
 
   io.line(
     renderKeyValue(io, [
-      ['User', `${profile.user_name ?? '—'} (${profile.user_id})`],
-      ['Email', profile.email ?? '—'],
-      ['Broker', profile.broker ?? '—'],
+      ['Profile', profileName === 'default' ? profileName : io.bold(profileName)],
+      ['User', `${account.user_name ?? '—'} (${account.user_id})`],
+      ['Email', account.email ?? '—'],
+      ['Broker', account.broker ?? '—'],
       ['Environment', ctx.env === 'sandbox' ? io.cyan('sandbox') : 'production'],
-      ['Exchanges', profile.exchanges.join(', ') || '—'],
-      ['Products', profile.products.join(', ') || '—'],
+      ['Exchanges', account.exchanges.join(', ') || '—'],
+      ['Products', account.products.join(', ') || '—'],
       [
         'Session expires',
         meta ? `${dateTime(meta.expiresAt)} IST (${timeUntilExpiry(meta)} left)` : 'unknown (token from environment)',
@@ -288,6 +318,64 @@ async function whoami(ctx: Context): Promise<void> {
       ['Keyring', (await keyringAvailable()) ? 'available' : 'unavailable (using encrypted file)'],
     ]),
   );
+}
+
+/** Enumerate every configured profile and its cached session, no network calls. */
+async function whoamiAll(ctx: Context): Promise<void> {
+  const { io } = ctx;
+  const config = await loadConfig();
+  const rows = await Promise.all(
+    listProfileNames(config).map(async (name) => {
+      const meta = await loadSessionMeta(name);
+      const status = !meta
+        ? io.dim('no session')
+        : isExpired(meta)
+          ? io.yellow('expired')
+          : `expires in ${timeUntilExpiry(meta)}`;
+      return {
+        profile: name,
+        env: getProfile(config, name).env,
+        user: meta?.userName ?? meta?.userId ?? '—',
+        session: status,
+        current: name === ctx.profile.name,
+      };
+    }),
+  );
+
+  printTable(
+    io,
+    rows,
+    [
+      { header: '', value: (r) => (r.current ? io.green('●') : ' ') },
+      { header: 'Profile', value: (r) => (r.current ? io.bold(r.profile) : r.profile) },
+      { header: 'Env', value: (r) => (r.env === 'sandbox' ? io.cyan(r.env) : r.env) },
+      { header: 'User', value: (r) => r.user },
+      { header: 'Session', value: (r) => r.session },
+    ],
+    rows.map(({ current: _current, ...rest }) => rest),
+  );
+}
+
+/**
+ * Persist a profile's (semi-public) api key so later runs find it. The default
+ * profile keeps its key at the top level of the config for back-compat; a named
+ * profile is registered under `profiles`, which also makes it show up in
+ * `kite profiles`. Reads the raw config fresh so the in-memory effective
+ * trading overlay is never written back.
+ */
+async function persistProfileApiKey(profileName: string, env: Environment, apiKey: string): Promise<void> {
+  const config = await loadConfig();
+  if (profileName === 'default') {
+    if (config.apiKey === apiKey) return;
+    await saveConfig({ ...config, apiKey });
+    return;
+  }
+  const existing = config.profiles[profileName];
+  if (existing?.apiKey === apiKey && existing?.env === env) return;
+  await saveConfig({
+    ...config,
+    profiles: { ...config.profiles, [profileName]: { ...existing, apiKey, env } },
+  });
 }
 
 async function promptText(message: string, hint?: string): Promise<string> {

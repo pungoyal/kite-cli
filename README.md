@@ -170,6 +170,54 @@ kite whoami --json || kite login       # exit code 3 means "no session"
 
 `NO_COLOR` is honoured, and colour is disabled automatically when stdout is not a TTY.
 
+## Multiple accounts
+
+If you run more than one Zerodha account — your own, a family member's, an HUF — each
+gets a named **profile** with its own Kite Connect app credentials and its own daily
+session. Several accounts can be logged in at once; you choose which one a command
+targets.
+
+```bash
+kite profiles add huf                 # register a profile (create its Kite app first)
+kite --profile huf login              # log in to it (prompts for that app's key + secret)
+kite --profile huf holdings           # run any command against it
+kite profiles list                    # see every profile and its session status
+kite profiles use huf                 # make it the default for commands without --profile
+```
+
+Selection is resolved fresh every run — there is no hidden "active account" that
+persists silently between commands. The target is chosen by, in order:
+
+1. `--profile <name>` on the command line
+2. the `KITE_PROFILE` environment variable
+3. the default set with `kite profiles use`
+4. otherwise the `default` profile
+
+`default` is your original single-account setup (nothing to migrate), and `sandbox`
+is a reserved profile — `--env sandbox` is just shorthand for `--profile sandbox`.
+
+Because targeting the wrong account is the costly mistake here, every money-moving
+confirmation shows the **verified account** it will hit — the user id returned by
+Kite, not just the label you chose:
+
+```
+Place BUY order
+  Account   Priya Sharma (XY9876) · profile huf
+  Symbol    NSE:INFY
+  …
+```
+
+Safety caps are per profile, inheriting the global setting when unset (an omitted cap
+never means "no cap"):
+
+```bash
+kite --profile huf config set trading.maxOrderValue 50000
+```
+
+For scripts and CI, `KITE_API_KEY` / `KITE_API_SECRET` / `KITE_ACCESS_TOKEN` still
+supply credentials directly. As a safeguard, naming a profile explicitly while those
+are set is refused rather than silently overridden.
+
 ## Safety
 
 This tool spends real money, so the defaults are conservative.
@@ -238,6 +286,10 @@ kite config path
 | `redirectPort` / `redirectPath` | Loopback callback URL for login |
 
 Config lives at `~/.config/kite/config.json` (`0600`). Override the location with `KITE_CONFIG_DIR`.
+
+`trading.*`, `apiKey`, and `env` can be set per profile by adding `--profile <name>`
+(see [Multiple accounts](#multiple-accounts)); the remaining keys are global. The
+account this invocation resolves to is selected by `--profile` / `KITE_PROFILE`.
 
 ## Things worth knowing about Kite
 
