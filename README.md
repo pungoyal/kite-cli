@@ -187,6 +187,11 @@ kite profiles list                    # see every profile and its session status
 kite profiles use huf                 # make it the default for commands without --profile
 ```
 
+`profiles add` can take the account's settings up front so `login` doesn't have to
+prompt for them: `--api-key <key>`, `--env sandbox` (the profile's environment,
+default `production`), and `--max-order-value <rupees>` (a per-profile cap). The API
+secret is never a flag — `login` always prompts for it.
+
 Selection is resolved fresh every run — there is no hidden "active account" that
 persists silently between commands. The target is chosen by, in order:
 
