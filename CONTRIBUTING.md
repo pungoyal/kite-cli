@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in kite-cli. This tool places real orders with real money, so the bar for changes is deliberately high — but the workflow is ordinary.
+Thanks for your interest in kite-connect-cli. This tool places real orders with real money, so the bar for changes is deliberately high — but the workflow is ordinary.
 
 ## Prerequisites
 
@@ -10,8 +10,8 @@ Thanks for your interest in kite-cli. This tool places real orders with real mon
 ## Setup
 
 ```bash
-git clone https://github.com/pungoyal/kite-cli.git
-cd kite-cli
+git clone https://github.com/pungoyal/kite-connect-cli.git
+cd kite-connect-cli
 npm install
 npm run hooks:install   # enable the Biome pre-commit hook (one time, per clone)
 ```
@@ -126,10 +126,10 @@ Verify a published release with:
 
 ```bash
 npm audit signatures      # registry signature + provenance attestation
-npm view kite-cli version
+npm view kite-connect-cli version
 ```
 
 **First release only:** the trusted publisher must be configured once at
-`npmjs.com/package/kite-cli/access` (repository `pungoyal/kite-cli`, workflow
+`npmjs.com/package/kite-connect-cli/access` (repository `pungoyal/kite-connect-cli`, workflow
 `release.yml`, environment `release`) before the first tag is pushed. Nothing in
 CI can create that binding for you.

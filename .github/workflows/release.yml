@@ -64,6 +64,6 @@ jobs:
       # No NODE_AUTH_TOKEN. Trusted Publishing authenticates via OIDC, and
       # provenance is generated automatically — the --provenance flag is no
       # longer needed. Configure the trusted publisher at
-      # npmjs.com/package/kite-cli/access before the first release.
+      # npmjs.com/package/kite-connect-cli/access before the first release.
       - name: Publish
         run: npm publish

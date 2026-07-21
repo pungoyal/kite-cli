@@ -1,7 +1,7 @@
-# kite-cli
+# kite-connect-cli
 
-[![CI](https://github.com/pungoyal/kite-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/pungoyal/kite-cli/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/kite-cli.svg)](https://www.npmjs.com/package/kite-cli)
+[![CI](https://github.com/pungoyal/kite-connect-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/pungoyal/kite-connect-cli/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/kite-connect-cli.svg)](https://www.npmjs.com/package/kite-connect-cli)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A5%2022.12-brightgreen.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -27,7 +27,7 @@ $ kite holdings
 ## Install
 
 ```bash
-npm install -g kite-cli
+npm install -g kite-connect-cli
 ```
 
 Requires **Node 22.12 or newer**.
@@ -251,7 +251,7 @@ Config lives at `~/.config/kite/config.json` (`0600`). Override the location wit
 The client is exported if you want it without the CLI:
 
 ```ts
-import { KiteClient, KiteApi, endpointsFor } from 'kite-cli';
+import { KiteClient, KiteApi, endpointsFor } from 'kite-connect-cli';
 
 const client = new KiteClient({
   apiKey: process.env.KITE_API_KEY!,

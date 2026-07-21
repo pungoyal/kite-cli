@@ -37,5 +37,5 @@ Initial release.
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/pungoyal/kite-cli/releases/tag/v0.1.0
+[Unreleased]: https://github.com/pungoyal/kite-connect-cli/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/pungoyal/kite-connect-cli/releases/tag/v0.1.0

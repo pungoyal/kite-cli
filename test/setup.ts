@@ -15,8 +15,8 @@ const REAL_CREDENTIAL_VARS = ['KITE_API_SECRET', 'KITE_ACCESS_TOKEN', 'KITE_API_
 
 beforeEach(() => {
   // Sandbox all filesystem state into a per-run temp directory.
-  process.env['KITE_CONFIG_DIR'] = `${process.env['VITEST_TMP'] ?? '/tmp'}/kite-cli-test-${process.pid}/config`;
-  process.env['KITE_CACHE_DIR'] = `${process.env['VITEST_TMP'] ?? '/tmp'}/kite-cli-test-${process.pid}/cache`;
+  process.env['KITE_CONFIG_DIR'] = `${process.env['VITEST_TMP'] ?? '/tmp'}/kite-connect-cli-test-${process.pid}/config`;
+  process.env['KITE_CACHE_DIR'] = `${process.env['VITEST_TMP'] ?? '/tmp'}/kite-connect-cli-test-${process.pid}/cache`;
   // Never read or write the developer's actual keychain.
   process.env['KITE_DISABLE_KEYRING'] = '1';
 
