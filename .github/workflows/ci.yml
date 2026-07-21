@@ -91,6 +91,12 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
 
+      # docs/commands.md is generated from `--help` output, not hand-written —
+      # this fails the build if a command or flag changed without also
+      # regenerating the checked-in file.
+      - name: Command reference is up to date
+        run: npm run docs:commands:check
+
       # publint catches malformed exports/bin fields; attw catches type
       # resolution that breaks for consumers.
       - name: Validate published package shape

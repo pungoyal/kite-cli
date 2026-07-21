@@ -48,7 +48,31 @@ npm run typecheck     # tsc --noEmit over src, test, and configs
 npm test              # vitest (unit, in-process E2E, and built-binary smoke)
 npm run build         # tsc -> dist/
 npm run lint:publish  # publint + are-the-types-wrong on the packed tarball
+npm run docs:commands:check  # docs/commands.md matches current `--help` output
 ```
+
+If you added, removed, or changed a command's flags, regenerate the command
+reference and commit the result: `npm run docs:commands` (needs a fresh
+`npm run build` first, since it runs against `dist/cli.js`).
+
+### The documentation site
+
+The reference pages under `docs/` are published to
+[pungoyal.github.io/kite-cli](https://pungoyal.github.io/kite-cli/) with
+[VitePress](https://vitepress.dev). It is a self-contained workspace with its
+own `package.json` and lockfile, deliberately kept out of the CLI package's
+dependency closure — a plain `npm install` at the repo root never pulls it in.
+
+```bash
+npm run docs:dev      # install docs deps + serve with hot reload
+npm run docs:build    # production build (what CI deploys)
+```
+
+Editing a `docs/*.md` page and pushing to `main` triggers the `Docs` workflow,
+which builds the site and deploys it to GitHub Pages. Links from a docs page to
+source files or README sections use absolute `github.com` URLs (they live
+outside the site); links between docs pages stay as relative `*.md` paths so
+they resolve both in the rendered site and when browsing `docs/` on GitHub.
 
 Formatting and linting are handled by [Biome](https://biomejs.dev) (config in
 `biome.json`): 2-space indent, single quotes, semicolons, trailing commas,

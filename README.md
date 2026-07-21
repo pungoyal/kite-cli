@@ -4,7 +4,8 @@
 [![npm version](https://img.shields.io/npm/v/@pungoyal/kite-cli.svg)](https://www.npmjs.com/package/@pungoyal/kite-cli)
 [![Release](https://img.shields.io/github/v/release/pungoyal/kite-cli?sort=semver&color=blue)](https://github.com/pungoyal/kite-cli/releases/latest)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A5%2022.12-brightgreen.svg)](https://nodejs.org)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/pungoyal/kite-cli/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-kite--cli-2496ed.svg)](https://pungoyal.github.io/kite-cli/)
 
 An **unofficial**, secure, scriptable command-line interface for the [Zerodha Kite Connect](https://kite.trade/docs/connect/v3/) API.
 
@@ -61,6 +62,8 @@ kite --env sandbox holdings
 **Running more than one Zerodha account?** See [Multiple accounts](#multiple-accounts).
 
 ## Usage
+
+The highlights are below; every command's full flag list is in [the command reference](https://pungoyal.github.io/kite-cli/commands).
 
 ### Portfolio
 
@@ -246,9 +249,11 @@ For scripts and CI, `KITE_API_KEY` / `KITE_API_SECRET` / `KITE_ACCESS_TOKEN` sti
 supply credentials directly. As a safeguard, naming a profile explicitly while those
 are set is refused rather than silently overridden.
 
+→ Full reference, including credential storage precedence and per-profile inheritance: [the configuration reference](https://pungoyal.github.io/kite-cli/configuration).
+
 ## Safety
 
-This tool spends real money, so the defaults are conservative.
+This tool spends real money, so the defaults are conservative. → Full model, including the order-tag reconciliation flow and why cancels/converts are exempt from the value cap: [the safety model](https://pungoyal.github.io/kite-cli/safety).
 
 **Confirmation.** Order commands render the resolved order — the actual instrument token, lot size, and computed value, not an echo of your flags — and wait for confirmation. That's deliberate: a flag echo can't catch "I typed the wrong symbol and it resolved to a different contract," which is the expensive mistake.
 
@@ -287,13 +292,13 @@ Automatic retries are restricted to `GET`/`HEAD` at the transport layer. `POST`,
 
 Your API secret is never accepted as a command-line argument, because argv is visible to any local process via `ps` and lands in shell history. It's prompted for, or read from the environment.
 
-**Redaction.** Access tokens are registered with a scrubber that runs over every log line, error message, and stack trace. The two paths that carry a token — the `Authorization` header and the WebSocket URL, where it's a query parameter — are covered explicitly and [tested](test/redact.test.ts).
+**Redaction.** Access tokens are registered with a scrubber that runs over every log line, error message, and stack trace. The two paths that carry a token — the `Authorization` header and the WebSocket URL, where it's a query parameter — are covered explicitly and [tested](https://github.com/pungoyal/kite-cli/blob/main/test/redact.test.ts).
 
 **TOTP.** This CLI will never ask for or store your 2FA seed. Storing it next to your API secret would collapse both authentication factors into one, which is exactly what the SEBI 2FA mandate exists to prevent. Login happens in your browser; the CLI only sees the resulting request token.
 
 **Supply chain.** 10 direct runtime dependencies, most of them zero-dependency. Published from GitHub Actions via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) with OIDC — no long-lived publish token exists. Provenance attestation is generated automatically; verify it with `npm audit signatures`. All CI actions are pinned to full commit SHAs, and dependency lifecycle scripts are disabled.
 
-To report a vulnerability, see [SECURITY.md](SECURITY.md).
+To report a vulnerability, see [SECURITY.md](https://github.com/pungoyal/kite-cli/blob/main/SECURITY.md).
 
 ## Configuration
 
@@ -319,6 +324,8 @@ Config lives at `~/.config/kite/config.json` (`0600`). Override the location wit
 (see [Multiple accounts](#multiple-accounts)); the remaining keys are global. The
 account this invocation resolves to is selected by `--profile` / `KITE_PROFILE`.
 
+→ Every key and environment variable, with precedence: [the configuration reference](https://pungoyal.github.io/kite-cli/configuration).
+
 ## Things worth knowing about Kite
 
 - **Sessions expire at 6:00 AM IST daily.** This is a regulatory requirement and there's no way around it — you log in once per trading day. Refresh tokens exist in the API but are only issued to exchange-approved platforms, not individual subscribers.
@@ -328,6 +335,25 @@ account this invocation resolves to is selected by `--profile` / `KITE_PROFILE`.
 - **Kite caps order modifications at 25** per order. After that you must cancel and re-place.
 - **Instruments are cached by `exchange:tradingsymbol`, never by token.** Exchanges reuse numeric instrument tokens after expiry, so a token-keyed cache silently resolves to the wrong contract after a rollover.
 - **Mutual funds are read-only** over the API — placing MF orders requires a bank debit that has no API path.
+
+→ Hit one of these? See [the troubleshooting guide](https://pungoyal.github.io/kite-cli/troubleshooting) for the symptom-first version.
+
+## Documentation
+
+This README covers installation and everyday usage. The full reference is a
+searchable site at **[pungoyal.github.io/kite-cli](https://pungoyal.github.io/kite-cli/)**:
+
+- [Safety model](https://pungoyal.github.io/kite-cli/safety) — the full layered safety model (kill
+  switch, value cap, confirmation escalation, order-tag reconciliation).
+- [Configuration](https://pungoyal.github.io/kite-cli/configuration) — every config key and
+  environment variable, with precedence.
+- [Troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) — symptom-first fixes
+  for session expiry, rate limits, login issues, and more.
+- [Command reference](https://pungoyal.github.io/kite-cli/commands) — full flag-by-flag reference for
+  every command, generated from `--help`.
+- [Library API](https://pungoyal.github.io/kite-cli/api) — the library/programmatic API surface.
+
+The same pages are browsable as Markdown in [`docs/`](https://github.com/pungoyal/kite-cli/tree/main/docs).
 
 ## Library use
 
@@ -360,7 +386,7 @@ npm run build
 
 ## Contributing
 
-Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and the two non-negotiables (safety defaults and secret redaction), and [CHANGELOG.md](CHANGELOG.md) for release history. Security issues go through [SECURITY.md](SECURITY.md), never a public issue.
+Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](https://github.com/pungoyal/kite-cli/blob/main/CONTRIBUTING.md) for the development workflow and the two non-negotiables (safety defaults and secret redaction), and [CHANGELOG.md](https://github.com/pungoyal/kite-cli/blob/main/CHANGELOG.md) for release history. Security issues go through [SECURITY.md](https://github.com/pungoyal/kite-cli/blob/main/SECURITY.md), never a public issue.
 
 ## Disclaimer
 
@@ -370,4 +396,4 @@ Trading involves risk of financial loss. This software is provided as-is under t
 
 ## Licence
 
-[MIT](LICENSE)
+[MIT](https://github.com/pungoyal/kite-cli/blob/main/LICENSE)
