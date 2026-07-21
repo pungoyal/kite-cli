@@ -649,15 +649,22 @@ Options:
                                  "LastTradedPrice")
   --type <type>                  simple or ato (ato places an order when it
                                  fires) (default: "simple")
-  -s, --side <side>              ATO: order side, BUY or SELL
-  -q, --quantity <n>             ATO: order quantity
-  --order-type <type>            ATO: order type (MARKET, LIMIT, SL, SL-M)
-                                 (default: "MARKET")
-  -p, --price <price>            ATO: limit price (for LIMIT/SL orders)
-  --trigger-price <price>        ATO: trigger price (for SL/SL-M orders)
-  --product <product>            ATO: product (CNC, NRML, MIS, MTF) (default:
-                                 "CNC")
-  --validity <validity>          ATO: validity (DAY, IOC, TTL) (default: "DAY")
+  --order <spec>                 ATO: a basket leg as
+                                 EXCHANGE:SYMBOL:SIDE:QTY[:TYPE][:PRICE][:PRODUCT][:VALIDITY][:trigger=<n>].
+                                 Repeatable. (default: [])
+  -s, --side <side>              ATO: order side, BUY or SELL (single-order
+                                 form)
+  -q, --quantity <n>             ATO: order quantity (single-order form)
+  --order-type <type>            ATO: order type, default MARKET (MARKET, LIMIT,
+                                 SL, SL-M) (single-order form)
+  -p, --price <price>            ATO: limit price (single-order form; for
+                                 LIMIT/SL)
+  --trigger-price <price>        ATO: trigger price (single-order form; for
+                                 SL/SL-M)
+  --product <product>            ATO: product, default CNC (CNC, NRML, MIS, MTF)
+                                 (single-order form)
+  --validity <validity>          ATO: validity, default DAY (DAY, IOC, TTL)
+                                 (single-order form)
   -h, --help                     display help for command
 ```
 

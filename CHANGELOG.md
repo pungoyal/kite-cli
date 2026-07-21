@@ -8,6 +8,19 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- `alerts create` now accepts a repeatable `--order` flag, so an ATO alert can
+  place a basket of orders — each on its own instrument, independent of the
+  watched one (e.g. watch `NSE:INDIGO`, fire an order on `NFO:INDIGO25AUGFUT`).
+  Each leg is `EXCHANGE:SYMBOL:SIDE:QTY` followed by optional attributes (an
+  order type, product, validity, a price, or `trigger=<n>`), parsed by content
+  so field order does not matter. A leg that can't be parsed unambiguously is
+  rejected rather than silently defaulted, the value cap sums every leg and
+  fails closed if any one can't be priced, and `--order` cannot be mixed with
+  the single-order flags. The existing `--side`/`--quantity` flags stay as a
+  shorthand for a single order on the watched instrument.
+
 ## [0.2.1] - 2026-07-21
 
 ### Added

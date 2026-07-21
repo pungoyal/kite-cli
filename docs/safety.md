@@ -147,6 +147,14 @@ subject to the safety model above:
   `orders place`, because the money-moving event is the alert *firing*, not
   just its creation — by the time it fires, no one is there to confirm it.
 
+An ATO can carry a **basket** of orders (`--order`, repeatable), each on its own
+instrument and independent of the watched one. The value cap applies to the
+basket *total*: every leg is priced and summed, and if any single leg cannot be
+priced the whole total is treated as unknown, so the cap escalates rather than
+waving the alert through. A leg specification that cannot be parsed
+unambiguously is rejected outright — a silently mis-parsed leg would be a real
+order with the wrong parameters.
+
 ## Account identity in every preview
 
 Every confirmation and dry-run preview shows the **verified account** —

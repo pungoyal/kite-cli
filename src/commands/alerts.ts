@@ -57,14 +57,29 @@ export const alertCommands: CommandFactory = (program, run) => {
     .option('--name <name>', 'Alert name (defaults to a description of the condition)')
     .option('--attribute <attribute>', 'Attribute to compare', ALERT_DEFAULT_ATTRIBUTE)
     .option('--type <type>', 'simple or ato (ato places an order when it fires)', 'simple')
-    // ATO order flags — mirror `orders place`. Only read when --type ato.
-    .option('-s, --side <side>', 'ATO: order side, BUY or SELL')
-    .option('-q, --quantity <n>', 'ATO: order quantity')
-    .option('--order-type <type>', `ATO: order type (${ORDER_TYPES.join(', ')})`, 'MARKET')
-    .option('-p, --price <price>', 'ATO: limit price (for LIMIT/SL orders)')
-    .option('--trigger-price <price>', 'ATO: trigger price (for SL/SL-M orders)')
-    .option('--product <product>', `ATO: product (${PRODUCTS.join(', ')})`, 'CNC')
-    .option('--validity <validity>', `ATO: validity (${VALIDITIES.join(', ')})`, 'DAY')
+    // ATO basket. Two shapes, never mixed:
+    //   --order  — a full basket leg, repeatable, each on its own instrument
+    //              (independent of the watched one). This is how you place
+    //              orders on a different symbol, or several at once.
+    //   the flags below — a shorthand for a single order on the *watched*
+    //              instrument, kept for back-compat.
+    .option(
+      '--order <spec>',
+      'ATO: a basket leg as EXCHANGE:SYMBOL:SIDE:QTY[:TYPE][:PRICE][:PRODUCT][:VALIDITY][:trigger=<n>]. Repeatable.',
+      collect,
+      [] as string[],
+    )
+    // ATO single-order flags — a shorthand for one order on the watched
+    // instrument. Read only when --type ato and no --order is given; combining
+    // them with --order is a hard error, so they carry NO defaults here (a
+    // default would be invisible to that guard and silently ignored).
+    .option('-s, --side <side>', 'ATO: order side, BUY or SELL (single-order form)')
+    .option('-q, --quantity <n>', 'ATO: order quantity (single-order form)')
+    .option('--order-type <type>', `ATO: order type, default MARKET (${ORDER_TYPES.join(', ')}) (single-order form)`)
+    .option('-p, --price <price>', 'ATO: limit price (single-order form; for LIMIT/SL)')
+    .option('--trigger-price <price>', 'ATO: trigger price (single-order form; for SL/SL-M)')
+    .option('--product <product>', `ATO: product, default CNC (${PRODUCTS.join(', ')}) (single-order form)`)
+    .option('--validity <validity>', `ATO: validity, default DAY (${VALIDITIES.join(', ')}) (single-order form)`)
     .action(run(createAlert));
 
   alerts
@@ -226,13 +241,16 @@ const CreateOptionsSchema = z.object({
   name: z.string().optional(),
   attribute: z.string().default(ALERT_DEFAULT_ATTRIBUTE),
   type: z.string().default('simple'),
+  order: z.array(z.string()).default([]),
   side: z.string().optional(),
   quantity: z.coerce.number().int().positive().optional(),
-  orderType: z.string().default('MARKET'),
+  // No defaults: these are single-order-form flags, and defaulting them would
+  // make them undetectable to the guard that forbids mixing them with --order.
+  orderType: z.string().optional(),
   price: z.coerce.number().positive().optional(),
   triggerPrice: z.coerce.number().positive().optional(),
-  product: z.string().default('CNC'),
-  validity: z.string().default('DAY'),
+  product: z.string().optional(),
+  validity: z.string().optional(),
 });
 
 async function createAlert(ctx: Context, rawOpts: unknown, command: { args: string[] }): Promise<void> {
@@ -295,7 +313,8 @@ async function createAlert(ctx: Context, rawOpts: unknown, command: { args: stri
     // ATO creation IS order placement: it needs the kill switch, the value cap,
     // and the full escalating confirmation, exactly like `orders place`.
     assertTradingEnabled(ctx);
-    const { basket, notionalValue, orderDetails } = await buildAtoBasket(ctx, opts, lhs);
+    const legs = resolveAtoLegs(opts, lhs);
+    const { basket, notionalValue, orderDetails } = await buildAtoBasket(ctx, legs);
     params.basket = basket;
 
     await confirmAction(ctx, {
@@ -331,32 +350,63 @@ async function createAlert(ctx: Context, rawOpts: unknown, command: { args: stri
   }
 }
 
+/** One order in an ATO basket, fully resolved and validated. */
+export interface AtoLeg {
+  exchange: string;
+  tradingsymbol: string;
+  side: TransactionType;
+  quantity: number;
+  orderType: OrderType;
+  price: number | undefined;
+  triggerPrice: number | undefined;
+  product: Product;
+  validity: Validity;
+}
+
 /**
- * Build the single-order basket for an ATO alert from the order flags, and
- * price it for the value cap.
- *
- * Returns the notional as UNDEFINED when it cannot be priced, so the safety
- * layer fails closed (escalates to a typed challenge) rather than treating an
- * unknown value as small.
+ * Resolve the ATO basket's legs from the parsed options. The `--order` form
+ * (one leg per flag, each on its own instrument) and the single-order flag form
+ * are mutually exclusive: mixing them is a hard error rather than a silent
+ * precedence rule, because the two describe different orders and a guessed
+ * winner would place the wrong one.
  */
-async function buildAtoBasket(
-  ctx: Context,
+function resolveAtoLegs(
   opts: z.infer<typeof CreateOptionsSchema>,
   lhs: { exchange: string; tradingsymbol: string },
-): Promise<{
-  basket: AlertBasket;
-  notionalValue: number | undefined;
-  orderDetails: Array<{ label: string; value: string }>;
-}> {
-  if (!opts.side) throw new UsageError('--side (BUY or SELL) is required for an ATO alert.');
-  if (opts.quantity === undefined) throw new UsageError('--quantity is required for an ATO alert.');
+): AtoLeg[] {
+  if (opts.order.length > 0) {
+    const usedSingleFlags =
+      opts.side !== undefined ||
+      opts.quantity !== undefined ||
+      opts.price !== undefined ||
+      opts.triggerPrice !== undefined ||
+      opts.orderType !== undefined ||
+      opts.product !== undefined ||
+      opts.validity !== undefined;
+    if (usedSingleFlags) {
+      throw new UsageError(
+        'Use either --order (repeatable) or the single-order flags (--side/--quantity/--price/...), not both.',
+      );
+    }
+    return opts.order.map(parseOrderSpec);
+  }
+  return [legFromFlags(opts, lhs)];
+}
+
+/** Build a single leg on the *watched* instrument from the shorthand flags. */
+function legFromFlags(
+  opts: z.infer<typeof CreateOptionsSchema>,
+  lhs: { exchange: string; tradingsymbol: string },
+): AtoLeg {
+  if (!opts.side) throw new UsageError('--side (BUY or SELL) is required for an ATO alert (or use --order).');
+  if (opts.quantity === undefined) throw new UsageError('--quantity is required for an ATO alert (or use --order).');
 
   const side = opts.side.toUpperCase();
   if (side !== 'BUY' && side !== 'SELL') throw new UsageError('--side must be BUY or SELL.');
 
-  const orderType = normalise(opts.orderType, ORDER_TYPES, 'order type') as OrderType;
-  const product = normalise(opts.product, PRODUCTS, 'product') as Product;
-  const validity = normalise(opts.validity, VALIDITIES, 'validity') as Validity;
+  const orderType = normalise(opts.orderType ?? 'MARKET', ORDER_TYPES, 'order type') as OrderType;
+  const product = normalise(opts.product ?? 'CNC', PRODUCTS, 'product') as Product;
+  const validity = normalise(opts.validity ?? 'DAY', VALIDITIES, 'validity') as Validity;
 
   if ((orderType === 'LIMIT' || orderType === 'SL') && opts.price === undefined) {
     throw new UsageError(`--price is required for a ${orderType} order.`);
@@ -368,67 +418,224 @@ async function buildAtoBasket(
     throw new UsageError('--price cannot be used with a MARKET order.');
   }
 
-  // The ATO order trades the LHS (watched) instrument.
-  const instrumentKey = formatInstrumentKey(lhs.exchange, lhs.tradingsymbol);
+  return {
+    exchange: lhs.exchange,
+    tradingsymbol: lhs.tradingsymbol,
+    side: side as TransactionType,
+    quantity: opts.quantity,
+    orderType,
+    price: opts.price,
+    triggerPrice: opts.triggerPrice,
+    product,
+    validity,
+  };
+}
 
-  // Price for the value cap. An explicit limit price is authoritative; otherwise
-  // fall back to the last traded price, leaving it undefined if that fails.
-  let referencePrice = opts.price;
-  if (referencePrice === undefined) {
-    try {
-      const ltp = await ctx.api.getLtp([instrumentKey], ctx.signal);
-      referencePrice = ltp[instrumentKey]?.last_price;
-    } catch {
-      // Quote bucket is 1/sec; a 429 here is routine. Leave undefined.
-    }
+/**
+ * Parse one `--order` spec into a leg.
+ *
+ * Grammar: `EXCHANGE:SYMBOL:SIDE:QTY` followed by any number of optional
+ * attribute tokens. Each attribute is either a bare vocabulary word (an order
+ * type, a product, a validity, or a number read as the price) or an explicit
+ * `key=value` (type, product, validity, price, trigger).
+ *
+ * Fails closed (invariant #1): every trailing token must be classified exactly
+ * once. An unrecognised token, a duplicated field, or an empty field rejects the
+ * whole spec — a silently mis-parsed leg is a real order with the wrong
+ * parameters. A trigger price is only ever set explicitly (`trigger=<n>`), never
+ * positionally, so an SL order can't be misread from two bare numbers.
+ */
+export function parseOrderSpec(spec: string): AtoLeg {
+  const raw = spec.trim();
+  const tokens = raw.split(':').map((t) => t.trim());
+  if (tokens.length < 4) {
+    throw new UsageError(
+      `Malformed --order "${spec}".`,
+      'Expected at least EXCHANGE:SYMBOL:SIDE:QTY, e.g. NFO:INDIGO25AUGFUT:BUY:150:MARKET:NRML.',
+    );
   }
-  if (referencePrice === undefined) {
-    ctx.io.warn(`Could not fetch a price for ${instrumentKey}; this alert's order value cannot be estimated.`);
-  }
-  const notionalValue = referencePrice !== undefined ? referencePrice * opts.quantity : undefined;
 
-  const basket: AlertBasket = {
-    name: 'kite-cli-alert',
-    type: 'alert',
-    tags: [],
-    items: [
-      {
-        type: 'insert',
-        tradingsymbol: lhs.tradingsymbol,
-        exchange: lhs.exchange,
-        // Documented baskets use 10000 (a full-allocation weight) for a single
-        // item; we follow the docs rather than invent a value.
-        weight: 10000,
-        params: {
-          transaction_type: side as TransactionType,
-          order_type: orderType,
-          product,
-          validity,
-          quantity: opts.quantity,
-          price: opts.price ?? 0,
-          trigger_price: opts.triggerPrice ?? 0,
-          variety: 'regular',
-        },
-      },
-    ],
+  // Guaranteed present by the length check above.
+  const [exchangeTok, symbolTok, sideTok, qtyTok, ...rest] = tokens as [string, string, string, string, ...string[]];
+  const { exchange, tradingsymbol } = parseInstrumentKey(`${exchangeTok}:${symbolTok}`);
+
+  const side = sideTok.toUpperCase();
+  if (side !== 'BUY' && side !== 'SELL') {
+    throw new UsageError(`--order side must be BUY or SELL, got "${sideTok}" in "${spec}".`);
+  }
+
+  const quantity = Number(qtyTok);
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new UsageError(`--order quantity must be a positive integer, got "${qtyTok}" in "${spec}".`);
+  }
+
+  let orderType: OrderType | undefined;
+  let price: number | undefined;
+  let triggerPrice: number | undefined;
+  let product: Product | undefined;
+  let validity: Validity | undefined;
+
+  const setOnce = <T>(current: T | undefined, next: T, label: string): T => {
+    if (current !== undefined) throw new UsageError(`--order "${spec}" sets ${label} more than once.`);
+    return next;
   };
 
-  const orderDetails = [
-    {
-      label: 'Order',
-      value: `${side === 'BUY' ? ctx.io.green(side) : ctx.io.red(side)} ${quantity(opts.quantity)} ${lhs.tradingsymbol}`,
-    },
-    { label: 'Order type', value: orderType },
-    ...(opts.price !== undefined ? [{ label: 'Price', value: rupees(opts.price) }] : []),
-    ...(opts.triggerPrice !== undefined ? [{ label: 'Trigger', value: rupees(opts.triggerPrice) }] : []),
-    { label: 'Product', value: product },
-    { label: 'Validity', value: validity },
-    {
-      label: 'Est. order value',
-      value: notionalValue !== undefined ? rupees(notionalValue) : ctx.io.dim('unknown (no quote available)'),
-    },
-  ];
+  for (const tok of rest) {
+    if (tok === '') {
+      throw new UsageError(`--order "${spec}" has an empty field. Remove the stray ":".`);
+    }
+    const eq = tok.indexOf('=');
+    if (eq !== -1) {
+      const key = tok.slice(0, eq).trim().toLowerCase();
+      const value = tok.slice(eq + 1).trim();
+      switch (key) {
+        case 'type':
+          orderType = setOnce(orderType, normalise(value, ORDER_TYPES, 'order type') as OrderType, 'the order type');
+          break;
+        case 'product':
+          product = setOnce(product, normalise(value, PRODUCTS, 'product') as Product, 'the product');
+          break;
+        case 'validity':
+          validity = setOnce(validity, normalise(value, VALIDITIES, 'validity') as Validity, 'the validity');
+          break;
+        case 'price':
+          price = setOnce(price, parsePositive(value, 'price', spec), 'the price');
+          break;
+        case 'trigger':
+          triggerPrice = setOnce(triggerPrice, parsePositive(value, 'trigger', spec), 'the trigger price');
+          break;
+        default:
+          throw new UsageError(
+            `--order "${spec}" has an unknown field "${key}".`,
+            'Valid keys: type, price, trigger, product, validity.',
+          );
+      }
+      continue;
+    }
 
+    const upper = tok.toUpperCase();
+    if ((ORDER_TYPES as readonly string[]).includes(upper)) {
+      orderType = setOnce(orderType, upper as OrderType, 'the order type');
+    } else if ((PRODUCTS as readonly string[]).includes(upper)) {
+      product = setOnce(product, upper as Product, 'the product');
+    } else if ((VALIDITIES as readonly string[]).includes(upper)) {
+      validity = setOnce(validity, upper as Validity, 'the validity');
+    } else if (isNumeric(tok)) {
+      // A bare number is always the price. A trigger must be given explicitly.
+      price = setOnce(price, parsePositive(tok, 'price', spec), 'the price');
+    } else {
+      throw new UsageError(
+        `--order "${spec}" has an unrecognised field "${tok}".`,
+        'Fields after QTY are an order type, product, validity, a price, or trigger=<n>.',
+      );
+    }
+  }
+
+  const type = orderType ?? 'MARKET';
+  if ((type === 'LIMIT' || type === 'SL') && price === undefined) {
+    throw new UsageError(`--order "${spec}" is a ${type} order and needs a price.`);
+  }
+  if ((type === 'SL' || type === 'SL-M') && triggerPrice === undefined) {
+    throw new UsageError(`--order "${spec}" is a ${type} order and needs trigger=<price>.`);
+  }
+  if (type === 'MARKET' && price !== undefined) {
+    throw new UsageError(`--order "${spec}" is a MARKET order and cannot set a price.`);
+  }
+
+  return {
+    exchange,
+    tradingsymbol,
+    side: side as TransactionType,
+    quantity,
+    orderType: type,
+    price,
+    triggerPrice,
+    product: product ?? 'CNC',
+    validity: validity ?? 'DAY',
+  };
+}
+
+/**
+ * Price every leg and assemble the basket for the value cap and confirmation.
+ *
+ * Returns the notional as UNDEFINED when *any* leg cannot be priced, so the
+ * safety layer fails closed (escalates to a typed challenge) rather than
+ * treating an unknown total as small. Legs without an explicit limit price are
+ * quoted in a single batched LTP call.
+ */
+async function buildAtoBasket(
+  ctx: Context,
+  legs: AtoLeg[],
+): Promise<{
+  basket: AlertBasket;
+  notionalValue: number | undefined;
+  orderDetails: Array<{ label: string; value: string }>;
+}> {
+  // Quote every leg that has no explicit price, in one call (the quote bucket
+  // is 1/sec, so N separate lookups would rate-limit).
+  const needQuote = [
+    ...new Set(legs.filter((l) => l.price === undefined).map((l) => formatInstrumentKey(l.exchange, l.tradingsymbol))),
+  ];
+  let ltp: Awaited<ReturnType<Context['api']['getLtp']>> = {};
+  if (needQuote.length > 0) {
+    try {
+      ltp = await ctx.api.getLtp(needQuote, ctx.signal);
+    } catch {
+      // A 429 here is routine; leave legs unpriced so the cap fails closed.
+    }
+  }
+
+  let notionalValue: number | undefined = 0;
+  const items: AlertBasket['items'] = [];
+  const orderDetails: Array<{ label: string; value: string }> = [];
+
+  legs.forEach((leg, i) => {
+    const key = formatInstrumentKey(leg.exchange, leg.tradingsymbol);
+    const referencePrice = leg.price ?? ltp[key]?.last_price;
+    if (referencePrice === undefined) {
+      // One unpriceable leg voids the whole total — never sum around a gap.
+      notionalValue = undefined;
+      ctx.io.warn(`Could not fetch a price for ${key}; this alert's order value cannot be estimated.`);
+    } else if (notionalValue !== undefined) {
+      notionalValue += referencePrice * leg.quantity;
+    }
+
+    items.push({
+      type: 'insert',
+      tradingsymbol: leg.tradingsymbol,
+      exchange: leg.exchange,
+      // Documented single-item baskets use 10000 (a full-allocation weight). The
+      // multi-item weighting is undocumented; params drive the actual order, so
+      // we keep 10000 per leg rather than invent a split.
+      weight: 10000,
+      params: {
+        transaction_type: leg.side,
+        order_type: leg.orderType,
+        product: leg.product,
+        validity: leg.validity,
+        quantity: leg.quantity,
+        price: leg.price ?? 0,
+        trigger_price: leg.triggerPrice ?? 0,
+        variety: 'regular',
+      },
+    });
+
+    const sideText = leg.side === 'BUY' ? ctx.io.green(leg.side) : ctx.io.red(leg.side);
+    const bits = [`${leg.orderType}`, leg.product];
+    if (leg.price !== undefined) bits.push(`@ ${rupees(leg.price)}`);
+    if (leg.triggerPrice !== undefined) bits.push(`trigger ${rupees(leg.triggerPrice)}`);
+    orderDetails.push({
+      label: legs.length === 1 ? 'Order' : `Order ${i + 1}`,
+      value: `${sideText} ${quantity(leg.quantity)} ${key} (${bits.join(', ')})`,
+    });
+  });
+
+  orderDetails.push({
+    label: legs.length === 1 ? 'Est. order value' : 'Est. total value',
+    value: notionalValue !== undefined ? rupees(notionalValue) : ctx.io.dim('unknown (no quote available)'),
+  });
+
+  const basket: AlertBasket = { name: 'kite-cli-alert', type: 'alert', tags: [], items };
   return { basket, notionalValue, orderDetails };
 }
 
@@ -611,6 +818,24 @@ function normalise(value: string, allowed: readonly string[], label: string): st
   const candidate = value.toUpperCase();
   if (allowed.includes(candidate)) return candidate;
   throw new UsageError(`Unknown ${label} "${value}".`, `Valid values: ${allowed.join(', ')}.`);
+}
+
+/** Commander reducer for a repeatable option: accumulate values into an array. */
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+/** A finite number literal — rejects '', 'NaN', '1e', '2900abc', etc. */
+function isNumeric(value: string): boolean {
+  return value !== '' && Number.isFinite(Number(value));
+}
+
+function parsePositive(value: string, label: string, spec: string): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new UsageError(`--order "${spec}" has an invalid ${label} "${value}"; expected a positive number.`);
+  }
+  return n;
 }
 
 function renderTableFor<T>(ctx: Context, rows: readonly T[], columns: Array<Column<T>>): string {
