@@ -20,6 +20,11 @@ updates:
     commit-message:
       prefix: deps
       prefix-development: deps-dev
+    ignore:
+      # @types/node tracks the MINIMUM supported Node major (22, per engines),
+      # not the latest — so we never type against APIs missing from Node 22.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       # Fold routine dev-dependency bumps into a single PR to cut noise; runtime
       # dependencies and any major bump still get their own reviewable PR.
