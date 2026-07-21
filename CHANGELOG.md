@@ -8,6 +8,8 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-21
+
 ### Added
 
 - **Price alerts (`kite alerts`).** Create, list, inspect, modify and delete Kite
@@ -20,11 +22,6 @@ While the version is `0.x`, minor releases may contain breaking changes.
   - **ATO** (Alert-Triggers-Order) alerts place a real order when they fire.
     Creating one (`--type ato` with the order flags) goes through the same
     confirmation, value cap and kill switch as `orders place`.
-
-## [0.2.0] - 2026-07-21
-
-### Added
-
 - **Multiple accounts (profiles).** Run several Zerodha accounts side by side, each
   with its own Kite Connect app credentials and its own daily session. Select the
   target account with `--profile <name>` or `KITE_PROFILE`; manage profiles with
