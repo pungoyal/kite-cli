@@ -39,7 +39,8 @@ export const profileCommands: CommandFactory = (program, run) => {
     .description('Register a new account profile (does not log in)')
     .argument('<name>', 'A short label, e.g. personal or huf')
     .option('--api-key <key>', 'Kite Connect API key for this account')
-    .option('--env <env>', 'production or sandbox (default: production)')
+    // `--env` is a global option; it cannot be redeclared here without being
+    // shadowed by the root parser, so `addProfile` reads it from ctx.options.
     .option('--max-order-value <rupees>', 'Per-profile cap on any single order')
     .action(run(addProfile));
 
@@ -103,7 +104,7 @@ async function listProfiles(ctx: Context): Promise<void> {
 
 async function addProfile(
   ctx: Context,
-  opts: { apiKey?: string; env?: string; maxOrderValue?: string },
+  opts: { apiKey?: string; maxOrderValue?: string },
   command: { args: string[] },
 ): Promise<void> {
   const { io } = ctx;
@@ -124,9 +125,13 @@ async function addProfile(
 
   const entry: ProfileConfig = {};
   if (opts.apiKey) entry.apiKey = opts.apiKey;
-  if (opts.env) {
-    const parsed = EnvironmentSchema.safeParse(opts.env);
-    if (!parsed.success) throw new UsageError(`Unknown environment "${opts.env}". Expected "production" or "sandbox".`);
+  // The global `--env` lands in ctx.options (see the command definition). It was
+  // already validated by profile resolution, so re-check defensively only.
+  if (ctx.options.env) {
+    const parsed = EnvironmentSchema.safeParse(ctx.options.env);
+    if (!parsed.success) {
+      throw new UsageError(`Unknown environment "${ctx.options.env}". Expected "production" or "sandbox".`);
+    }
     entry.env = parsed.data;
   }
   if (opts.maxOrderValue !== undefined) {
