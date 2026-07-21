@@ -79,7 +79,7 @@
     "msw": "^2.15.0",
     "publint": "^0.3.0",
     "strip-ansi": "^7.1.0",
-    "typescript": "^5.8.0",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }
