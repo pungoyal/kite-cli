@@ -35,7 +35,7 @@ for anything that would otherwise touch a real account.
 - `src/context.ts` — assembles config, credentials, client, api, instruments per run.
 - `src/safety.ts` — confirmation prompts, kill switch, value cap, unique order tags.
 - `src/commands/*` — one file per command group. Keep these thin: parse, prompt, render.
-- `src/core/*` — the real logic: `client` (HTTP + retry policy), `api` (typed endpoints, batching, chunking), `auth`, `credentials`/`secretstore`, `redact`, `ratelimit`, `ticker` (WebSocket), `instruments`, `schemas` (zod), `errors`.
+- `src/core/*` — the real logic: `client` (HTTP + retry policy), `api` (typed endpoints, batching, chunking), `auth`, `credentials`/`secretstore`, `profiles` (multi-account resolution), `redact`, `ratelimit`, `ticker` (WebSocket), `instruments`, `schemas` (zod), `errors`.
 - `src/output/*` — io stream discipline, tables, INR/IST formatting.
 
 Networking, validation, batching, and rate limiting live in `core/`, never in
@@ -48,6 +48,7 @@ commands, so the exported library gets identical behaviour.
 3. **Never auto-retry writes.** `POST`/`PUT`/`DELETE` (place/modify/cancel) are never retried — Kite has no idempotency key. Ambiguous failures reconcile against a unique client tag.
 4. **Key instruments by `EXCHANGE:TRADINGSYMBOL`, never by token.** Exchanges reuse numeric tokens after expiry.
 5. **Validate every response** through a zod schema in `schemas.ts` (loose objects, so new Kite fields don't break parsing).
+6. **Show the verified account on every money-moving confirmation.** With multiple profiles, the preview names the `user_id` Kite returned, not just the chosen profile label. Secrets and sessions are namespaced by profile (`storagePrefixFor`); `default` stays unprefixed for back-compat. An explicit `--profile` plus a conflicting `KITE_ACCESS_TOKEN`/`KITE_API_SECRET` fails closed.
 
 ## Kite gotchas worth remembering
 

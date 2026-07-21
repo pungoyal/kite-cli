@@ -55,6 +55,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
     .option('--quiet', 'Suppress informational messages')
     .option('--debug', 'Print redacted request diagnostics to stderr')
     .option('--env <env>', 'Environment: production or sandbox')
+    .option('--profile <name>', 'Account profile to use (see `kite profiles`)')
     .option('-y, --yes', 'Skip confirmation prompts (use with care)')
     .option('--dry-run', 'Show what would happen without sending anything to Kite')
     .showHelpAfterError('(run `kite --help` for usage)')
@@ -86,6 +87,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
   // Registered lazily so a bare `kite quote` never pays to import the
   // dashboard renderer, the ticker, or the prompt library.
   const { authCommands } = await import('./commands/auth.js');
+  const { profileCommands } = await import('./commands/profiles.js');
   const { portfolioCommands } = await import('./commands/portfolio.js');
   const { marketCommands } = await import('./commands/market.js');
   const { orderCommands } = await import('./commands/orders.js');
@@ -98,6 +100,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
   // difference between a readable --help and a wall of text.
   program.commandsGroup('Account:');
   authCommands(program, withContext);
+  profileCommands(program, withContext);
 
   program.commandsGroup('Portfolio:');
   portfolioCommands(program, withContext);
@@ -127,6 +130,7 @@ Examples:
   $ kite orders place NSE:INFY -s BUY -q 1 --dry-run
                                                 Preview an order without sending it
   $ kite positions --json | jq '.net[].pnl'     Machine-readable output
+  $ kite --profile huf holdings                 Run against another account (kite profiles)
 
 Safety:
   Order commands preview the resolved order and ask for confirmation.

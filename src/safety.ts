@@ -190,17 +190,29 @@ function renderPreview(ctx: Context, opts: ConfirmOptions, force = false): void 
   const { io } = ctx;
   if ((io.json || io.quiet) && !force) return;
 
-  const width = Math.max(...opts.details.map((d) => d.label.length));
+  const width = Math.max('Account'.length, ...opts.details.map((d) => d.label.length));
   const emit = force ? (text: string) => io.forceNote(text) : (text: string) => io.note(text);
 
   emit('');
   emit(io.bold(opts.action));
+  // Which account this will hit, first and by verified identity — not just the
+  // profile label a user chose, which can point at the wrong app. This is the
+  // primary guard against placing an order on the wrong account.
+  emit(`  ${io.dim('Account'.padEnd(width))}  ${accountLine(ctx)}`);
   for (const detail of opts.details) {
     emit(`  ${io.dim(detail.label.padEnd(width))}  ${detail.value}`);
   }
   if (ctx.env === 'sandbox') {
     emit(`  ${io.cyan('sandbox — no real money involved')}`);
   }
+}
+
+/** The verified identity behind this invocation, with the profile for context. */
+function accountLine(ctx: Context): string {
+  const { io, session, profile } = ctx;
+  const who = session ? `${session.userName ?? session.userId} (${session.userId})` : io.dim('token from environment');
+  const suffix = profile.name === 'default' ? '' : ` · profile ${io.bold(profile.name)}`;
+  return `${who}${suffix}`;
 }
 
 /**

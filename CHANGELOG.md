@@ -8,6 +8,31 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **Multiple accounts (profiles).** Run several Zerodha accounts side by side, each
+  with its own Kite Connect app credentials and its own daily session. Select the
+  target account with `--profile <name>` or `KITE_PROFILE`; manage profiles with
+  `kite profiles` (`list`, `add`, `remove`, `use`, `current`). `kite whoami --all`
+  lists every profile's session. See the new *Multiple accounts* README section.
+  - Your existing single-account setup is the `default` profile and needs no
+    migration; `--env sandbox` is now shorthand for `--profile sandbox`.
+  - Trading safety (`trading.*`, kill switch, value cap) can be set per profile and
+    inherits the global setting when unset — an omitted cap never means "no cap".
+
+### Changed
+
+- Money-moving confirmations now show the **verified account** they will hit — the
+  user id returned by Kite, not just a label — as the first line of the preview.
+- `kite whoami --json` now nests the Kite profile object under `account` and reports
+  the active `profile`.
+
+### Security
+
+- Naming a profile explicitly (`--profile` / `KITE_PROFILE`) while
+  `KITE_ACCESS_TOKEN` or `KITE_API_SECRET` is set in the environment is now refused,
+  rather than silently using the ambient token against the named account.
+
 ## [0.1.1] - 2026-07-21
 
 First release published through the automated GitHub Actions pipeline (npm Trusted

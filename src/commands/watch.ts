@@ -96,7 +96,7 @@ async function watch(
   const tokenToKey = new Map(watchlist.map((entry) => [entry.token, entry.key]));
 
   // --- credentials for the socket ----------------------------------------
-  const stored = await getSecret('access_token', { env: ctx.env });
+  const stored = await getSecret('access_token', { scope: ctx.credentialScope });
   if (!stored) {
     throw new KiteCliError('No access token available for streaming.', ExitCode.Auth, 'Run `kite login`.');
   }

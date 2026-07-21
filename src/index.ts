@@ -44,6 +44,16 @@ export {
   parseInstrumentsCsv,
 } from './core/instruments.js';
 export {
+  DEFAULT_PROFILE,
+  getProfile,
+  listProfileNames,
+  type ResolvedProfile,
+  resolveProfile,
+  resolveTradingConfig,
+  SANDBOX_PROFILE,
+  storagePrefixFor,
+} from './core/profiles.js';
+export {
   ORDER_LIMITS,
   type RateCategory,
   RateLimiter,

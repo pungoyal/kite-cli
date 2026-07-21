@@ -30,9 +30,17 @@ export function configFile(): string {
   return join(configDir(), 'config.json');
 }
 
-/** Non-secret session metadata (expiry, user id). The token itself is not here. */
-export function sessionFile(): string {
-  return join(configDir(), 'session.json');
+/**
+ * Non-secret session metadata (expiry, user id) for a profile. The token itself
+ * is not here.
+ *
+ * The `default` profile keeps the historical `session.json` path so existing
+ * installs are untouched; every other profile gets its own `session.<name>.json`,
+ * which is what lets several accounts hold live sessions at once.
+ */
+export function sessionFile(profile = 'default'): string {
+  if (profile === 'default') return join(configDir(), 'session.json');
+  return join(configDir(), `session.${profile}.json`);
 }
 
 /** Encrypted credential store, used only when the OS keyring is unavailable. */

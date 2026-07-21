@@ -88,8 +88,8 @@ export class KiteApiError extends KiteCliError {
 
 /** The local session is missing or expired. */
 export class AuthRequiredError extends KiteCliError {
-  constructor(message = 'Not logged in.') {
-    super(message, ExitCode.Auth, 'Run `kite login` to start a session.');
+  constructor(message = 'Not logged in.', hint = 'Run `kite login` to start a session.') {
+    super(message, ExitCode.Auth, hint);
   }
 }
 
