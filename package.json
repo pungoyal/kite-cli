@@ -1,0 +1,77 @@
+{
+  "name": "kite-cli",
+  "version": "0.1.0",
+  "description": "A secure, scriptable command-line interface for the Zerodha Kite Connect API",
+  "keywords": [
+    "zerodha",
+    "kite",
+    "kiteconnect",
+    "trading",
+    "stocks",
+    "cli",
+    "nse",
+    "bse"
+  ],
+  "license": "MIT",
+  "author": "Puneet Goyal",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pungoyal/kite-cli.git"
+  },
+  "homepage": "https://github.com/pungoyal/kite-cli#readme",
+  "bugs": {
+    "url": "https://github.com/pungoyal/kite-cli/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "bin": {
+    "kite": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node --experimental-strip-types src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "check:deps": "node scripts/check-deps.mjs",
+    "lint:publish": "publint && attw --pack . --profile esm-only",
+    "check:dist": "node -e \"const{existsSync,readFileSync}=require('node:fs');if(!existsSync('dist/cli.js'))throw new Error('dist/ is missing — run npm run build before publishing');if(!readFileSync('dist/cli.js','utf8').startsWith('#!/usr/bin/env node'))throw new Error('dist/cli.js lost its shebang')\"",
+    "prepublishOnly": "npm run build && npm run check:dist"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "@napi-rs/keyring": "^1.3.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "log-update": "^8.0.0",
+    "picocolors": "^1.1.1",
+    "undici": "^8.7.0",
+    "ws": "^8.21.1",
+    "yocto-spinner": "^1.2.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.0",
+    "@types/node": "^22.15.0",
+    "@types/ws": "^8.18.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "execa": "^10.0.0",
+    "msw": "^2.15.0",
+    "publint": "^0.3.0",
+    "strip-ansi": "^7.1.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.10"
+  }
+}

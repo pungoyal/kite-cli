@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false,
+
+    // Keeps `node --experimental-strip-types src/cli.ts` working for the dev
+    // loop by rejecting syntax that type-stripping cannot erase (enums,
+    // namespaces, parameter properties).
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    "sourceMap": true,
+    "noEmit": true,
+
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  // Covers everything for editors and `npm run typecheck`. Deliberately no
+  // `rootDir` here: it would have to be the repo root to contain test/ and
+  // vitest.config.ts, and pinning it to src/ makes those files a TS6059 error.
+  // The build config below sets rootDir and emits.
+  "include": ["src/**/*.ts", "test/**/*.ts", "*.config.ts"]
+}

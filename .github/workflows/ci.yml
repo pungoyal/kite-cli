@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default; jobs opt in to more where needed.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.12 is the floor declared in engines; 24 is Active LTS; 26 is Current.
+        node: ['22.12', '24', '26']
+    steps:
+      # Actions are pinned to full commit SHAs, not tags — tags are mutable and
+      # a compromised upstream can repoint them (cf. the tj-actions breach).
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # --ignore-scripts blocks dependency lifecycle hooks, the vector used by
+      # the Shai-Hulud worm. `npm ci` never resolves outside the lockfile.
+      - run: npm ci --ignore-scripts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+        env:
+          # Kite timestamps are IST. A UTC runner would diverge from a laptop
+          # and make date assertions flaky.
+          TZ: Asia/Kolkata
+
+      - name: Build
+        run: npm run build
+
+      - name: Assert the shebang survived the build
+        # Silent, total breakage that no unit test catches.
+        run: |
+          head -1 dist/cli.js | grep -qx '#!/usr/bin/env node' \
+            || { echo "dist/cli.js is missing its shebang"; exit 1; }
+
+      - name: Smoke test the built binary
+        run: node dist/cli.js --version
+
+  package:
+    name: Package checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      # Reads only the lockfile, so it fails fast before install if the
+      # production dependency closure has grown past its budget.
+      - name: Dependency budget
+        run: npm run check:deps
+
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+
+      # publint catches malformed exports/bin fields; attw catches type
+      # resolution that breaks for consumers.
+      - name: Validate published package shape
+        run: npm run lint:publish
+
+      - name: Report install size
+        run: npm pack --dry-run
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      # Verifies registry signatures and provenance attestations for every
+      # installed dependency.
+      - name: Verify dependency signatures
+        run: npm audit signatures
+
+      # A signal, not a gate: advisories land faster than fixes, and failing
+      # the build on an unfixable transitive advisory trains people to ignore it.
+      - name: Known vulnerabilities
+        run: npm audit --audit-level=high
+        continue-on-error: true

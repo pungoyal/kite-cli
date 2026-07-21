@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    # Trusted Publishing requires a GitHub-hosted runner; self-hosted is not
+    # supported.
+    environment: release
+    permissions:
+      contents: read
+      # Required for OIDC. This is what lets npm verify the workflow identity
+      # and generate provenance — no long-lived token exists anywhere.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          # Trusted Publishing needs npm >=11.5.1 and Node >=22.14.0.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+        env:
+          TZ: Asia/Kolkata
+
+      - name: Build
+        run: npm run build
+
+      - name: Assert the shebang survived the build
+        run: |
+          head -1 dist/cli.js | grep -qx '#!/usr/bin/env node' \
+            || { echo "dist/cli.js is missing its shebang"; exit 1; }
+
+      - name: Validate published package shape
+        run: npm run lint:publish
+
+      - name: Verify the tag matches package.json
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag $TAG does not match package.json version $PKG"
+            exit 1
+          fi
+
+      # No NODE_AUTH_TOKEN. Trusted Publishing authenticates via OIDC, and
+      # provenance is generated automatically — the --provenance flag is no
+      # longer needed. Configure the trusted publisher at
+      # npmjs.com/package/kite-cli/access before the first release.
+      - name: Publish
+        run: npm publish

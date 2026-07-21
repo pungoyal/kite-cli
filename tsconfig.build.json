@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Emit settings live here, not in the base config, so that `tsc --noEmit`
+    // over the whole repo (src + tests + configs) does not fight a rootDir
+    // that only makes sense for the published build.
+    "noEmit": false,
+    "declaration": true,
+    // No source or declaration maps in the published build: `files` ships only
+    // dist/, so maps would dangle against a src/ tree that is not in the
+    // tarball. Dropping them keeps the install small and avoids broken map refs.
+    "declarationMap": false,
+    "sourceMap": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}
