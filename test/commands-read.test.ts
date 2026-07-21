@@ -126,6 +126,47 @@ it('gtt list: renders triggers as JSON', async () => {
   expect(JSON.parse(out)[0].id).toBe(1);
 });
 
+it('alerts list: renders alerts as JSON', async () => {
+  pool()
+    .intercept({ path: '/alerts', method: 'GET' })
+    .reply(200, {
+      status: 'success',
+      data: [
+        {
+          uuid: 'u-1',
+          type: 'simple',
+          status: 'enabled',
+          lhs_exchange: 'INDICES',
+          lhs_tradingsymbol: 'NIFTY 50',
+          operator: '>=',
+          rhs_type: 'constant',
+          rhs_constant: 27000,
+        },
+      ],
+    });
+
+  const code = await invoke(['alerts', 'list', '--json']);
+  expect(code).toBe(ExitCode.Ok);
+  expect(JSON.parse(out)[0].uuid).toBe('u-1');
+});
+
+it('alerts delete: passes every UUID as a repeated query param', async () => {
+  let requestPath = '';
+  // Preview enrichment reads the alert list first; an empty list is fine.
+  pool().intercept({ path: '/alerts', method: 'GET' }).reply(200, { status: 'success', data: [] });
+  pool()
+    .intercept({ path: (p) => p.startsWith('/alerts') && !p.includes('history'), method: 'DELETE' })
+    .reply((opts) => {
+      requestPath = String(opts.path);
+      return { statusCode: 200, data: { status: 'success', data: {} } };
+    });
+
+  const code = await invoke(['alerts', 'delete', 'aaa', 'bbb', '--yes', '--json']);
+  expect(code).toBe(ExitCode.Ok);
+  expect(requestPath).toContain('uuid=aaa');
+  expect(requestPath).toContain('uuid=bbb');
+});
+
 it('ltp: renders last traded prices as JSON', async () => {
   pool()
     .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
