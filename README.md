@@ -160,6 +160,23 @@ kite alerts create NSE:INFY --operator below --value 1400 \
   --type ato --side BUY --quantity 10 --order-type LIMIT --price 1400
 ```
 
+The order an ATO fires need not be on the instrument you watch, and it can be a
+**basket of several orders** across different instruments. Use `--order` — one
+per leg, repeatable — where each leg is
+`EXCHANGE:SYMBOL:SIDE:QTY` followed by optional attributes (an order type,
+product, validity, a bare price, or `trigger=<n>`), in any order:
+
+```bash
+# Watch INDIGO's spot price; when it drops, buy the future and trim a hedge.
+kite alerts create NSE:INDIGO --operator below --value 3850 --type ato \
+  --order 'NFO:INDIGO25AUGFUT:BUY:150:MARKET:NRML' \
+  --order 'NSE:RELIANCE:SELL:10:LIMIT:2900'
+```
+
+The value cap sums every leg and fails closed if any one cannot be priced. The
+`--order` form and the single-order flags above (`--side`/`--quantity`/…) are
+mutually exclusive.
+
 `--operator` accepts the raw symbols (`>=`, `<=`, `>`, `<`, `==`) or the aliases
 `above`, `below`, `ge`, `le`, `gt`, `lt`, `eq`. Compare against another instrument
 instead of a constant with `--rhs-instrument EXCHANGE:SYMBOL`.
