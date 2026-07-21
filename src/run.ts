@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Command, CommanderError } from 'commander';
 import type { Handler } from './commands/types.js';
 import { createContext, type GlobalOptions } from './context.js';
@@ -10,7 +11,12 @@ export interface RunOptions {
   streams?: IoStreams;
 }
 
-const VERSION = '0.1.0';
+// Read from package.json so `npm version` is the single source of truth and
+// `kite --version` can never drift. `../package.json` resolves to the package
+// root from source (tests) and from dist/ (published), since package.json always
+// ships with the package.
+const VERSION = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string })
+  .version;
 
 /**
  * Build and execute the CLI.

@@ -8,9 +8,22 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-21
+
+First release published through the automated GitHub Actions pipeline (npm Trusted
+Publishing, OIDC — no long-lived token), carrying a provenance attestation you can
+verify with `npm audit signatures`. `0.1.0` was published by hand to bootstrap the
+package on npm.
+
+### Changed
+
+- `kite --version` now reads the version from `package.json` instead of a
+  hardcoded constant, so it can never drift from the published version.
+
 ## [0.1.0] - 2026-07-21
 
-Initial release.
+Initial release (bootstrap-published to npm by hand; `0.1.1` is the first
+provenance-backed release from CI).
 
 ### Added
 
@@ -28,7 +41,7 @@ Initial release.
 - The API secret is never accepted as a command-line argument; access tokens are registered with a redactor that scrubs every log line, error, and stack trace.
 - The login callback binds to `127.0.0.1` only and validates a random CSRF state in constant time.
 - TOTP seeds are never prompted for or stored.
-- Published from CI via npm Trusted Publishing (OIDC, no long-lived token) with provenance; CI actions are pinned to commit SHAs and dependency lifecycle scripts are disabled.
+- Supply-chain hardening: CI actions pinned to commit SHAs, dependency lifecycle scripts disabled, a dependency release cooldown, and a small, audited dependency tree.
 
 ### Safety
 
@@ -37,5 +50,6 @@ Initial release.
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/pungoyal/kite-cli/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/pungoyal/kite-cli/releases/tag/v0.1.0
