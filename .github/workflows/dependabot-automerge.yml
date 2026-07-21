@@ -1,0 +1,36 @@
+name: Dependabot auto-merge
+
+# Auto-merges only the low-risk Dependabot PRs — dev-dependency and GitHub
+# Actions patch/minor bumps — and only once every required CI check is green
+# (auto-merge waits for the branch-protection checks). Runtime-dependency
+# updates and any major bump are deliberately left for manual review.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      # Enable GitHub's native auto-merge for the safe tiers. It does not merge
+      # immediately — it merges once the required status checks pass, so CI
+      # (tests on three Node versions, Biome, package checks, the dependency
+      # budget, and the security audit) is always the real gate.
+      - name: Enable auto-merge for low-risk updates
+        if: >-
+          (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+           steps.meta.outputs.update-type == 'version-update:semver-minor') &&
+          (steps.meta.outputs.package-ecosystem == 'github_actions' ||
+           steps.meta.outputs.dependency-type == 'direct:development')
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
