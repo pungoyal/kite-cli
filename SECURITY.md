@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report security issues privately via [GitHub Security Advisories](https://github.com/pungoyal/kite-connect-cli/security/advisories/new) rather than opening a public issue.
+Please report security issues privately via [GitHub Security Advisories](https://github.com/pungoyal/kite-cli/security/advisories/new) rather than opening a public issue.
 
 Include what the issue is, how to reproduce it, and what an attacker could achieve. You'll get an acknowledgement within 72 hours and an assessment within a week.
 

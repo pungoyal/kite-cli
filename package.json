@@ -1,7 +1,7 @@
 {
-  "name": "kite-connect-cli",
+  "name": "@pungoyal/kite-cli",
   "version": "0.1.0",
-  "description": "A secure, scriptable command-line interface for the Zerodha Kite Connect API",
+  "description": "Unofficial command-line interface for the Zerodha Kite Connect API — not affiliated with or endorsed by Zerodha",
   "keywords": [
     "zerodha",
     "kite",
@@ -16,11 +16,11 @@
   "author": "Puneet Goyal",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pungoyal/kite-connect-cli.git"
+    "url": "git+https://github.com/pungoyal/kite-cli.git"
   },
-  "homepage": "https://github.com/pungoyal/kite-connect-cli#readme",
+  "homepage": "https://github.com/pungoyal/kite-cli#readme",
   "bugs": {
-    "url": "https://github.com/pungoyal/kite-connect-cli/issues"
+    "url": "https://github.com/pungoyal/kite-cli/issues"
   },
   "type": "module",
   "engines": {
@@ -32,6 +32,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -1,13 +1,15 @@
-# kite-connect-cli
+# kite-cli
 
-[![CI](https://github.com/pungoyal/kite-connect-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/pungoyal/kite-connect-cli/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/kite-connect-cli.svg)](https://www.npmjs.com/package/kite-connect-cli)
+[![CI](https://github.com/pungoyal/kite-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/pungoyal/kite-cli/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@pungoyal/kite-cli.svg)](https://www.npmjs.com/package/@pungoyal/kite-cli)
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A5%2022.12-brightgreen.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A secure, scriptable command-line interface for the [Zerodha Kite Connect](https://kite.trade/docs/connect/v3/) API.
+An **unofficial**, secure, scriptable command-line interface for the [Zerodha Kite Connect](https://kite.trade/docs/connect/v3/) API.
 
 Check your portfolio, stream live quotes, and place orders from the terminal — with credentials in your OS keyring, confirmations on anything that moves money, and clean JSON for piping into `jq`.
+
+> **Unofficial, independent project.** Not affiliated with, endorsed by, or sponsored by Zerodha. "Kite" and "Kite Connect" are trademarks of Zerodha Broking Ltd., referenced here only to describe the third-party API this tool works with.
 
 ```console
 $ kite holdings
@@ -27,7 +29,7 @@ $ kite holdings
 ## Install
 
 ```bash
-npm install -g kite-connect-cli
+npm install -g @pungoyal/kite-cli
 ```
 
 Requires **Node 22.12 or newer**.
@@ -251,7 +253,7 @@ Config lives at `~/.config/kite/config.json` (`0600`). Override the location wit
 The client is exported if you want it without the CLI:
 
 ```ts
-import { KiteClient, KiteApi, endpointsFor } from 'kite-connect-cli';
+import { KiteClient, KiteApi, endpointsFor } from '@pungoyal/kite-cli';
 
 const client = new KiteClient({
   apiKey: process.env.KITE_API_KEY!,
@@ -281,7 +283,9 @@ Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIB
 
 ## Disclaimer
 
-Not affiliated with or endorsed by Zerodha. Trading involves risk of financial loss. This software is provided as-is under the MIT licence — you are responsible for every order it places on your behalf. Test with `--env sandbox` and `--dry-run` before trusting it with real money.
+This is an unofficial, independent, community project. It is **not affiliated with, endorsed by, or sponsored by Zerodha**. "Kite", "Kite Connect", and "Zerodha" are trademarks of Zerodha Broking Ltd.; this project references them only to identify the third-party API it interoperates with (nominative use) and claims no rights to those marks.
+
+Trading involves risk of financial loss. This software is provided as-is under the MIT licence — you are responsible for every order it places on your behalf. Test with `--env sandbox` and `--dry-run` before trusting it with real money.
 
 ## Licence
 

@@ -4,9 +4,10 @@ Guidance for Claude Code (and other agents) working in this repository.
 
 ## What this is
 
-`kite-connect-cli` — a TypeScript CLI and library for the Zerodha Kite Connect v3 API. It
-places real orders with real money, so correctness, safety, and secret handling
-outrank features. ESM-only, Node ≥ 22.12.
+`kite-cli` — an unofficial TypeScript CLI and library for the Zerodha Kite
+Connect v3 API (not affiliated with or endorsed by Zerodha). It places real orders
+with real money, so correctness, safety, and secret handling outrank features.
+ESM-only, Node ≥ 22.12.
 
 ## Commands
 

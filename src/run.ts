@@ -40,7 +40,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
 
   program
     .name('kite')
-    .description('A secure command-line interface for the Zerodha Kite Connect API')
+    .description('Unofficial command-line interface for the Zerodha Kite Connect API (not affiliated with Zerodha)')
     .version(VERSION, '-v, --version')
     .option('--json', 'Emit JSON instead of formatted tables')
     .option('--color <when>', 'Colour output: auto, always, or never')

@@ -16,7 +16,7 @@ import { decryptFromFile, deleteCredentialFile, encryptToFile } from './secretst
  * blocks by default.
  */
 
-const SERVICE = 'kite-connect-cli';
+const SERVICE = 'kite-cli';
 
 export type SecretName = 'api_secret' | 'access_token';
 

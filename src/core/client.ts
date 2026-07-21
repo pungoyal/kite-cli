@@ -155,7 +155,7 @@ export class KiteClient {
     const headers: Record<string, string> = {
       'X-Kite-Version': '3',
       Accept: 'application/json',
-      'User-Agent': 'kite-connect-cli',
+      'User-Agent': 'kite-cli',
       ...extra,
     };
     if (this.accessToken) {
@@ -306,7 +306,7 @@ export class KiteClient {
           z.prettifyError(result.error),
         status: response.status,
         errorType: 'DataException',
-        hint: 'This usually means the API changed. Please open an issue at https://github.com/pungoyal/kite-connect-cli/issues',
+        hint: 'This usually means the API changed. Please open an issue at https://github.com/pungoyal/kite-cli/issues',
       });
     }
     return result.data;
