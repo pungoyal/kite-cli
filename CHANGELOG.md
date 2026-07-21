@@ -8,6 +8,8 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-21
+
 ### Added
 
 - **Multiple accounts (profiles).** Run several Zerodha accounts side by side, each
@@ -75,6 +77,7 @@ provenance-backed release from CI).
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/pungoyal/kite-cli/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/pungoyal/kite-cli/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/pungoyal/kite-cli/releases/tag/v0.1.0
