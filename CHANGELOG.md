@@ -8,6 +8,8 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-21
+
 ### Added
 
 - A `docs/` directory: a safety-model deep dive, a full configuration
@@ -17,6 +19,13 @@ While the version is `0.x`, minor releases may contain breaking changes.
   [pungoyal.github.io/kite-cli](https://pungoyal.github.io/kite-cli/), built
   from `docs/` with VitePress and deployed to GitHub Pages. The site is an
   isolated workspace, so it adds nothing to the installed CLI package.
+
+### Fixed
+
+- README links now use absolute URLs, so they resolve on npmjs.com and anywhere
+  the published package is read. The tarball ships only `dist/`, so the previous
+  repo-relative links (to `docs/`, `LICENSE`, `SECURITY.md`, and others) pointed
+  at files absent from the package and 404'd on the npm page.
 
 ## [0.2.0] - 2026-07-21
 
@@ -97,7 +106,8 @@ provenance-backed release from CI).
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/pungoyal/kite-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/pungoyal/kite-cli/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/pungoyal/kite-cli/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/pungoyal/kite-cli/releases/tag/v0.1.0
