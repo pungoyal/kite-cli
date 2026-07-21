@@ -6,35 +6,63 @@
  * validation, redaction and error taxonomy the CLI uses.
  */
 
-export { KiteClient, setDispatcher, type ClientOptions } from './core/client.js';
-export { KiteApi, type PlaceOrderParams, type ModifyOrderParams, type GttParams } from './core/api.js';
 export {
-  Ticker,
-  parsePacket,
-  parseBinaryMessage,
-  divisorFor,
-  isTradable,
-  type Tick,
-  type TickerMode,
-  type TickerOptions,
-} from './core/ticker.js';
-export { InstrumentStore, parseInstrumentsCsv, parseInstrumentKey } from './core/instruments.js';
-export { RateLimiter, ORDER_LIMITS, type RateCategory } from './core/ratelimit.js';
+  type GttParams,
+  KiteApi,
+  type ModifyOrderParams,
+  type PlaceOrderParams,
+} from './core/api.js';
 export {
+  buildLoginUrl,
   computeChecksum,
   computePostbackChecksum,
   verifyPostbackChecksum,
-  buildLoginUrl,
 } from './core/auth.js';
-export { redact, redactString, redactUrl, registerSecret, maskSecret } from './core/redact.js';
 export {
-  KiteCliError,
-  KiteApiError,
+  type ClientOptions,
+  KiteClient,
+  setDispatcher,
+} from './core/client.js';
+export {
+  type Endpoints,
+  type Environment,
+  endpointsFor,
+  SANDBOX_CREDENTIALS,
+} from './core/config.js';
+export {
   AuthRequiredError,
+  ExitCode,
+  KiteApiError,
+  KiteCliError,
+  type KiteErrorType,
   NetworkError,
   UsageError,
-  ExitCode,
-  type KiteErrorType,
 } from './core/errors.js';
-export { endpointsFor, SANDBOX_CREDENTIALS, type Environment, type Endpoints } from './core/config.js';
+export {
+  InstrumentStore,
+  parseInstrumentKey,
+  parseInstrumentsCsv,
+} from './core/instruments.js';
+export {
+  ORDER_LIMITS,
+  type RateCategory,
+  RateLimiter,
+} from './core/ratelimit.js';
+export {
+  maskSecret,
+  redact,
+  redactString,
+  redactUrl,
+  registerSecret,
+} from './core/redact.js';
 export * from './core/schemas.js';
+export {
+  divisorFor,
+  isTradable,
+  parseBinaryMessage,
+  parsePacket,
+  type Tick,
+  Ticker,
+  type TickerMode,
+  type TickerOptions,
+} from './core/ticker.js';

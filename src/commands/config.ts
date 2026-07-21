@@ -1,21 +1,18 @@
-import { loadConfig, saveConfig, ConfigSchema, SETTABLE_KEYS, isSettableKey } from '../core/config.js';
-import { configFile, configDir, cacheDir } from '../core/paths.js';
-import { keyringAvailable, getSecret } from '../core/credentials.js';
-import { redirectUrlFor } from '../core/auth.js';
-import { maskSecret } from '../core/redact.js';
-import { UsageError } from '../core/errors.js';
-import { renderKeyValue, heading } from '../output/table.js';
-import { rupees } from '../output/format.js';
 import type { Context } from '../context.js';
+import { redirectUrlFor } from '../core/auth.js';
+import { ConfigSchema, isSettableKey, loadConfig, SETTABLE_KEYS, saveConfig } from '../core/config.js';
+import { getSecret, keyringAvailable } from '../core/credentials.js';
+import { UsageError } from '../core/errors.js';
+import { cacheDir, configDir, configFile } from '../core/paths.js';
+import { maskSecret } from '../core/redact.js';
+import { rupees } from '../output/format.js';
+import { heading, renderKeyValue } from '../output/table.js';
 import type { CommandFactory } from './types.js';
 
 export const configCommands: CommandFactory = (program, run) => {
   const config = program.command('config').description('View and change CLI settings');
 
-  config
-    .command('show', { isDefault: true })
-    .description('Show the current configuration')
-    .action(run(showConfig));
+  config.command('show', { isDefault: true }).description('Show the current configuration').action(run(showConfig));
 
   config
     .command('set')
@@ -30,10 +27,7 @@ export const configCommands: CommandFactory = (program, run) => {
     .argument('<key>')
     .action(run(unsetConfig));
 
-  config
-    .command('path')
-    .description('Print the paths this CLI reads and writes')
-    .action(run(showPaths));
+  config.command('path').description('Print the paths this CLI reads and writes').action(run(showPaths));
 };
 
 async function showConfig(ctx: Context): Promise<void> {
@@ -53,17 +47,17 @@ async function showConfig(ctx: Context): Promise<void> {
       ['API key', config.apiKey ?? io.dim('not set')],
       ['API secret', secret ? `${maskSecret(secret.value)} (${secret.backend})` : io.dim('not set')],
       ['Environment', config.env === 'sandbox' ? io.cyan('sandbox') : 'production'],
-      ['Keyring', (await keyringAvailable()) ? io.green('available') : io.yellow('unavailable — using an encrypted file')],
+      [
+        'Keyring',
+        (await keyringAvailable()) ? io.green('available') : io.yellow('unavailable — using an encrypted file'),
+      ],
     ]),
   );
 
   io.line(heading(io, 'Trading safety'));
   io.line(
     renderKeyValue(io, [
-      [
-        'Trading enabled',
-        config.trading.enabled ? io.green('yes') : io.red('no — all order commands will refuse'),
-      ],
+      ['Trading enabled', config.trading.enabled ? io.green('yes') : io.red('no — all order commands will refuse')],
       ['Confirm orders', config.trading.confirm ? 'yes' : io.yellow('no')],
       ['Max order value', config.trading.maxOrderValue ? rupees(config.trading.maxOrderValue) : io.dim('no cap')],
       ['Strict confirm above', rupees(config.trading.strictConfirmAbove)],
@@ -139,10 +133,7 @@ async function unsetConfig(ctx: Context, _opts: unknown, command: { args: string
   const key = command.args[0];
   if (!key) throw new UsageError('A key is required.');
   if (!isSettableKey(key)) {
-    throw new UsageError(
-      `Unknown setting "${key}".`,
-      `Available settings: ${Object.keys(SETTABLE_KEYS).join(', ')}.`,
-    );
+    throw new UsageError(`Unknown setting "${key}".`, `Available settings: ${Object.keys(SETTABLE_KEYS).join(', ')}.`);
   }
 
   const config = await loadConfig();
@@ -201,15 +192,6 @@ function coerce(raw: string, type: 'string' | 'number' | 'boolean', key: string)
     return n;
   }
   return raw;
-}
-
-function readPath(target: unknown, path: string): unknown {
-  return path.split('.').reduce<unknown>((node, segment) => {
-    if (node && typeof node === 'object' && segment in node) {
-      return (node as Record<string, unknown>)[segment];
-    }
-    return undefined;
-  }, target);
 }
 
 function writePath(target: Record<string, unknown>, path: string, value: unknown): void {

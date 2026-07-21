@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { instrumentsCacheFile, cacheDir, ensurePrivateDir } from './paths.js';
-import { UsageError } from './errors.js';
 import type { KiteApi } from './api.js';
+import { UsageError } from './errors.js';
+import { cacheDir, ensurePrivateDir, instrumentsCacheFile } from './paths.js';
 import type { Instrument } from './schemas.js';
 
 /**
@@ -171,14 +171,7 @@ function isStale(fetchedAt: string, now: Date = new Date()): boolean {
   const istFetched = new Date(fetched + istOffsetMs);
 
   // Most recent 08:30 IST boundary, as a UTC instant.
-  let boundary = Date.UTC(
-    istNow.getUTCFullYear(),
-    istNow.getUTCMonth(),
-    istNow.getUTCDate(),
-    8,
-    30,
-    0,
-  );
+  let boundary = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 8, 30, 0);
   const istHour = istNow.getUTCHours() + istNow.getUTCMinutes() / 60;
   if (istHour < refreshHourIst) {
     boundary -= 24 * 3600 * 1000;
@@ -292,7 +285,11 @@ export class InstrumentStore {
    */
   search(
     query: string,
-    opts: { exchange?: string | undefined; type?: string | undefined; limit?: number } = {},
+    opts: {
+      exchange?: string | undefined;
+      type?: string | undefined;
+      limit?: number;
+    } = {},
   ): Instrument[] {
     const needle = query.trim().toUpperCase();
     if (needle === '') return [];

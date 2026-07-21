@@ -1,31 +1,29 @@
-import { describe, it, expect, vi } from 'vitest';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { describe, expect, it, vi } from 'vitest';
+import { chunks, formatIstDateTime, MAX_DAYS_PER_REQUEST, parseInterval, splitDateRange } from '../src/core/api.js';
 import {
+  buildLoginUrl,
   computeChecksum,
   computePostbackChecksum,
-  verifyPostbackChecksum,
-  buildLoginUrl,
   safeCompare,
+  verifyPostbackChecksum,
 } from '../src/core/auth.js';
-import { nextTokenExpiry, isExpired } from '../src/core/session.js';
-import { splitDateRange, formatIstDateTime, MAX_DAYS_PER_REQUEST, parseInterval, chunks } from '../src/core/api.js';
-import { parseInstrumentsCsv, parseCsv, parseInstrumentKey } from '../src/core/instruments.js';
-import { RateLimiter, ORDER_LIMITS } from '../src/core/ratelimit.js';
-import { ExitCode } from '../src/core/errors.js';
-import { encryptToFile, decryptFromFile } from '../src/core/secretstore.js';
 import { endpointsFor } from '../src/core/config.js';
+import { ExitCode } from '../src/core/errors.js';
+import { parseCsv, parseInstrumentKey, parseInstrumentsCsv } from '../src/core/instruments.js';
+import { configDir, credentialsFile } from '../src/core/paths.js';
+import { ORDER_LIMITS, RateLimiter } from '../src/core/ratelimit.js';
+import { decryptFromFile, encryptToFile } from '../src/core/secretstore.js';
+import { isExpired, nextTokenExpiry } from '../src/core/session.js';
 import { parseUserDate } from '../src/output/format.js';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
-import { credentialsFile, configDir } from '../src/core/paths.js';
 
 describe('login checksum', () => {
   it('is SHA-256 of api_key + request_token + api_secret concatenated', () => {
     // Verified independently: echo -n "abcdefghtokenxyzsecret123" | shasum -a 256
     const checksum = computeChecksum('abcdefgh', 'tokenxyz', 'secret123');
     expect(checksum).toMatch(/^[a-f0-9]{64}$/);
-    expect(checksum).toBe(
-      createHash('sha256').update('abcdefghtokenxyzsecret123').digest('hex'),
-    );
+    expect(checksum).toBe(createHash('sha256').update('abcdefghtokenxyzsecret123').digest('hex'));
   });
 });
 
@@ -74,22 +72,30 @@ describe('constant-time comparison', () => {
   });
 
   it('does not throw when verifying a postback checksum of the wrong shape', () => {
-    expect(() =>
-      verifyPostbackChecksum('é'.repeat(64), 'order1', '2026-07-20 10:00:00', 'secret'),
-    ).not.toThrow();
+    expect(() => verifyPostbackChecksum('é'.repeat(64), 'order1', '2026-07-20 10:00:00', 'secret')).not.toThrow();
   });
 });
 
 describe('login URL', () => {
   it('includes v=3 and carries CSRF state through redirect_params', () => {
-    const url = new URL(buildLoginUrl({ apiKey: 'key123', endpoints: endpointsFor('production'), state: 'abc123' }));
+    const url = new URL(
+      buildLoginUrl({
+        apiKey: 'key123',
+        endpoints: endpointsFor('production'),
+        state: 'abc123',
+      }),
+    );
     expect(url.searchParams.get('v')).toBe('3');
     expect(url.searchParams.get('api_key')).toBe('key123');
     expect(url.searchParams.get('redirect_params')).toBe('state=abc123');
   });
 
   it('points at the sandbox host in sandbox mode', () => {
-    const url = buildLoginUrl({ apiKey: 'sandboxdemo', endpoints: endpointsFor('sandbox'), state: 'x' });
+    const url = buildLoginUrl({
+      apiKey: 'sandboxdemo',
+      endpoints: endpointsFor('sandbox'),
+      state: 'x',
+    });
     expect(url).toContain('sandbox.kite.trade');
   });
 });
@@ -241,7 +247,10 @@ describe('instrument keys', () => {
   });
 
   it('defaults a bare symbol to NSE and upper-cases it', () => {
-    expect(parseInstrumentKey('infy')).toEqual({ exchange: 'NSE', tradingsymbol: 'INFY' });
+    expect(parseInstrumentKey('infy')).toEqual({
+      exchange: 'NSE',
+      tradingsymbol: 'INFY',
+    });
   });
 
   it('rejects a malformed key', () => {
@@ -329,7 +338,10 @@ describe('encrypted credential file', () => {
     await mkdir(configDir(), { recursive: true });
     await encryptToFile({ api_secret: 'topsecret', access_token: 'tok123' }, 'correct horse');
     const decrypted = await decryptFromFile('correct horse');
-    expect(decrypted).toEqual({ api_secret: 'topsecret', access_token: 'tok123' });
+    expect(decrypted).toEqual({
+      api_secret: 'topsecret',
+      access_token: 'tok123',
+    });
   });
 
   it('rejects the wrong passphrase', async () => {

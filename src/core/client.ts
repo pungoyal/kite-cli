@@ -1,16 +1,10 @@
-import { Agent, fetch, interceptors, type Dispatcher } from 'undici';
+import { Agent, type Dispatcher, fetch, interceptors } from 'undici';
 import { z } from 'zod';
-import {
-  KiteApiError,
-  NetworkError,
-  KiteCliError,
-  ExitCode,
-  hintForApiError,
-} from './errors.js';
-import { EnvelopeSchema, ErrorEnvelopeSchema } from './schemas.js';
-import { RateLimiter, type RateCategory } from './ratelimit.js';
-import { redact, redactString, registerSecret } from './redact.js';
 import type { Endpoints } from './config.js';
+import { ExitCode, hintForApiError, KiteApiError, KiteCliError, NetworkError } from './errors.js';
+import { type RateCategory, RateLimiter } from './ratelimit.js';
+import { redact, redactString, registerSecret } from './redact.js';
+import { EnvelopeSchema, ErrorEnvelopeSchema } from './schemas.js';
 
 /**
  * HTTP client for the Kite Connect v3 API.
@@ -204,9 +198,7 @@ export class KiteClient {
     const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 
     if (this.debug) {
-      this.onDebug(
-        `→ ${opts.method} ${redactString(url.toString())}${body ? ` body=${redactString(body)}` : ''}`,
-      );
+      this.onDebug(`→ ${opts.method} ${redactString(url.toString())}${body ? ` body=${redactString(body)}` : ''}`);
     }
 
     let response: FetchResponse;
@@ -250,18 +242,10 @@ export class KiteClient {
       return new KiteCliError('Cancelled.', ExitCode.Aborted);
     }
     const message = err instanceof Error ? err.message : String(err);
-    return new NetworkError(
-      `Could not reach Kite: ${redactString(message)}`,
-      'Check your network connection.',
-    );
+    return new NetworkError(`Could not reach Kite: ${redactString(message)}`, 'Check your network connection.');
   }
 
-  private handleResponse<S extends z.ZodType>(
-    response: FetchResponse,
-    text: string,
-    schema: S,
-    url: URL,
-  ): z.infer<S> {
+  private handleResponse<S extends z.ZodType>(response: FetchResponse, text: string, schema: S, url: URL): z.infer<S> {
     let payload: unknown;
     try {
       payload = JSON.parse(text);

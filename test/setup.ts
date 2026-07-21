@@ -1,5 +1,5 @@
-import { beforeEach, afterEach, expect } from 'vitest';
 import stripAnsi from 'strip-ansi';
+import { afterEach, beforeEach, expect } from 'vitest';
 
 /**
  * Global test setup.

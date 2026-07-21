@@ -1,6 +1,6 @@
-import { readFile, writeFile, chmod, unlink } from 'node:fs/promises';
+import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { sessionFile, configDir, ensurePrivateDir } from './paths.js';
+import { configDir, ensurePrivateDir, sessionFile } from './paths.js';
 
 /**
  * Non-secret session metadata.
@@ -45,7 +45,10 @@ export async function loadSessionMeta(): Promise<SessionMeta | null> {
 export async function saveSessionMeta(meta: SessionMeta): Promise<void> {
   await ensurePrivateDir(configDir());
   const path = sessionFile();
-  await writeFile(path, `${JSON.stringify(meta, null, 2)}\n`, { mode: 0o600, encoding: 'utf8' });
+  await writeFile(path, `${JSON.stringify(meta, null, 2)}\n`, {
+    mode: 0o600,
+    encoding: 'utf8',
+  });
   if (process.platform !== 'win32') {
     await chmod(path, 0o600);
   }

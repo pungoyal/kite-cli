@@ -1,28 +1,27 @@
-import { Command } from 'commander';
-import { text, password, isCancel, note } from '@clack/prompts';
+import { isCancel, note, password, text } from '@clack/prompts';
+import type { Context } from '../context.js';
 import {
   buildLoginUrl,
   computeChecksum,
   generateState,
-  waitForCallback,
   openBrowser,
   redirectUrlFor,
+  waitForCallback,
 } from '../core/auth.js';
-import { setSecret, deleteAllSecrets, getSecret, keyringAvailable } from '../core/credentials.js';
-import { saveConfig, SANDBOX_CREDENTIALS } from '../core/config.js';
+import { SANDBOX_CREDENTIALS, saveConfig } from '../core/config.js';
+import { deleteAllSecrets, getSecret, keyringAvailable, setSecret } from '../core/credentials.js';
+import { AbortedError, ExitCode, KiteCliError } from '../core/errors.js';
+import { maskSecret, registerSecret } from '../core/redact.js';
 import {
-  saveSessionMeta,
   clearSessionMeta,
+  isExpired,
   loadSessionMeta,
   nextTokenExpiry,
-  isExpired,
+  saveSessionMeta,
   timeUntilExpiry,
 } from '../core/session.js';
-import { KiteCliError, ExitCode, AbortedError } from '../core/errors.js';
-import { registerSecret, maskSecret } from '../core/redact.js';
-import { renderKeyValue } from '../output/table.js';
 import { dateTime } from '../output/format.js';
-import type { Context } from '../context.js';
+import { renderKeyValue } from '../output/table.js';
 import type { CommandFactory } from './types.js';
 
 export const authCommands: CommandFactory = (program, run) => {
@@ -40,16 +39,10 @@ export const authCommands: CommandFactory = (program, run) => {
     .option('--all', 'Also remove the stored API secret')
     .action(run(logout));
 
-  program
-    .command('whoami')
-    .description('Show the current session and account details')
-    .action(run(whoami));
+  program.command('whoami').description('Show the current session and account details').action(run(whoami));
 };
 
-async function login(
-  ctx: Context,
-  opts: { manual?: boolean; apiKey?: string; force?: boolean },
-): Promise<void> {
+async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; force?: boolean }): Promise<void> {
   const { io } = ctx;
 
   if (!opts.force && ctx.client.hasSession() && ctx.session && !isExpired(ctx.session)) {
@@ -64,7 +57,7 @@ async function login(
   const isSandbox = ctx.env === 'sandbox';
 
   // --- credentials -------------------------------------------------------
-  let apiKey = opts.apiKey ?? (isSandbox ? SANDBOX_CREDENTIALS.apiKey : ctx.config.apiKey ?? '');
+  let apiKey = opts.apiKey ?? (isSandbox ? SANDBOX_CREDENTIALS.apiKey : (ctx.config.apiKey ?? ''));
   let apiSecret: string;
 
   if (isSandbox) {
@@ -121,7 +114,9 @@ async function login(
   registerSecret(session.access_token);
 
   // --- persist ------------------------------------------------------------
-  const backend = await setSecret('access_token', session.access_token, { env: ctx.env });
+  const backend = await setSecret('access_token', session.access_token, {
+    env: ctx.env,
+  });
   if (!isSandbox) {
     await setSecret('api_secret', apiSecret, { env: ctx.env });
   }

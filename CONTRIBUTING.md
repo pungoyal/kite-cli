@@ -13,7 +13,13 @@ Thanks for your interest in kite-cli. This tool places real orders with real mon
 git clone https://github.com/pungoyal/kite-cli.git
 cd kite-cli
 npm install
+npm run hooks:install   # enable the Biome pre-commit hook (one time, per clone)
 ```
+
+`hooks:install` points git at `.githooks/`. It is a manual step because git never
+runs repo-committed hooks automatically, and this project's `.npmrc` sets
+`ignore-scripts=true`, so nothing runs it for you. The hook only checks staged
+files — it never rewrites them mid-commit.
 
 ## Development loop
 
@@ -36,11 +42,21 @@ npm run dev -- --env sandbox holdings
 Everything CI runs, you can run locally. All of these must pass before a PR merges:
 
 ```bash
+npm run lint          # Biome: formatting + lint (read-only; same as CI and the hook)
+npm run lint:fix      # Biome: auto-fix formatting and safe lint issues
 npm run typecheck     # tsc --noEmit over src, test, and configs
 npm test              # vitest (unit, in-process E2E, and built-binary smoke)
 npm run build         # tsc -> dist/
 npm run lint:publish  # publint + are-the-types-wrong on the packed tarball
 ```
+
+Formatting and linting are handled by [Biome](https://biomejs.dev) (config in
+`biome.json`): 2-space indent, single quotes, semicolons, trailing commas,
+120-column width. Two recommended rules are disabled deliberately —
+`noNonNullAssertion` (non-null assertions are the intended pattern under
+`noUncheckedIndexedAccess`) and `useLiteralKeys` (env vars are read via
+`process.env['X']` by convention). The pre-commit hook runs `biome check` on
+staged files; CI runs `biome ci` over everything.
 
 Tests run with `TZ=Asia/Kolkata` because Kite timestamps are IST; the config pins this so results are identical on a UTC CI runner.
 

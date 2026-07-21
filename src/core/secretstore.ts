@@ -1,8 +1,8 @@
-import { randomBytes, scrypt as scryptCb, createCipheriv, createDecipheriv, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { chmod, readFile, unlink, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { readFile, writeFile, chmod, unlink } from 'node:fs/promises';
-import { credentialsFile, configDir, ensurePrivateDir } from './paths.js';
-import { KiteCliError, ExitCode } from './errors.js';
+import { ExitCode, KiteCliError } from './errors.js';
+import { configDir, credentialsFile, ensurePrivateDir } from './paths.js';
 
 const scrypt = promisify(scryptCb) as (
   password: string | Buffer,
@@ -45,7 +45,11 @@ interface Header {
   nonce: string;
 }
 
-async function deriveKey(passphrase: string, salt: Buffer, params: { N: number; r: number; p: number }): Promise<Buffer> {
+async function deriveKey(
+  passphrase: string,
+  salt: Buffer,
+  params: { N: number; r: number; p: number },
+): Promise<Buffer> {
   return scrypt(passphrase, salt, KDF.keylen, {
     N: params.N,
     r: params.r,
@@ -73,10 +77,7 @@ export async function encryptToFile(secrets: Record<string, string>, passphrase:
   const cipher = createCipheriv('aes-256-gcm', key, nonce);
   // Bind the header so KDF parameters cannot be tampered with.
   cipher.setAAD(Buffer.from(headerJson, 'utf8'));
-  const ciphertext = Buffer.concat([
-    cipher.update(Buffer.from(JSON.stringify(secrets), 'utf8')),
-    cipher.final(),
-  ]);
+  const ciphertext = Buffer.concat([cipher.update(Buffer.from(JSON.stringify(secrets), 'utf8')), cipher.final()]);
   const tag = cipher.getAuthTag();
 
   const payload = `${headerJson}\n${Buffer.concat([ciphertext, tag]).toString('base64')}\n`;
@@ -121,7 +122,11 @@ export async function decryptFromFile(passphrase: string): Promise<Record<string
 
   const salt = Buffer.from(header.salt, 'base64');
   const nonce = Buffer.from(header.nonce, 'base64');
-  const key = await deriveKey(passphrase, salt, { N: header.N, r: header.r, p: header.p });
+  const key = await deriveKey(passphrase, salt, {
+    N: header.N,
+    r: header.r,
+    p: header.p,
+  });
 
   const blob = Buffer.from(body, 'base64');
   if (blob.length < 17) {

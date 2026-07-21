@@ -55,6 +55,24 @@ jobs:
       - name: Smoke test the built binary
         run: node dist/cli.js --version
 
+  lint:
+    name: Lint & format (Biome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      # `biome ci` is read-only: it fails if any file is unformatted or trips a
+      # lint rule, without modifying anything. Same command as the pre-commit
+      # hook and `npm run lint`, so local and CI never disagree.
+      - name: Biome check
+        run: npx biome ci
+
   package:
     name: Package checks
     runs-on: ubuntu-latest

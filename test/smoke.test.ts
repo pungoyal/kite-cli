@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { execa } from 'execa';
-import { readFile, access, rm } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { access, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execa } from 'execa';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 /**
  * Smoke tests against the real built binary.
@@ -33,7 +33,9 @@ beforeAll(async () => {
     // from anywhere without depending on step order. tsc is invoked directly
     // (not via `npm run build`) so this stays portable and shell-free.
     const tsc = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
-    await execa(process.execPath, [tsc, '-p', 'tsconfig.build.json'], { cwd: root });
+    await execa(process.execPath, [tsc, '-p', 'tsconfig.build.json'], {
+      cwd: root,
+    });
   }
 }, 120_000);
 
@@ -114,8 +116,9 @@ describe('stream discipline', () => {
 
   it('emits no ANSI escapes when NO_COLOR is set', async () => {
     const result = await kite(['config', 'show']);
-    // eslint-disable-next-line no-control-regex
-    expect(result.stdout).not.toMatch(/\[/);
+    // Assert the absence of the ANSI CSI introducer (ESC + '[') without a
+    // control character inside a regex literal.
+    expect(result.stdout).not.toContain('\u001b[');
   });
 });
 

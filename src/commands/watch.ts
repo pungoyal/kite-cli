@@ -1,11 +1,11 @@
 import logUpdate from 'log-update';
-import { Ticker, MAX_INSTRUMENTS_PER_CONNECTION, type Tick, type TickerMode } from '../core/ticker.js';
-import { getSecret } from '../core/credentials.js';
-import { parseInstrumentKey, formatInstrumentKey } from '../core/instruments.js';
-import { UsageError, KiteCliError, ExitCode } from '../core/errors.js';
-import { renderTable, type Column } from '../output/table.js';
-import { money, percent, compactNumber, timeOnly } from '../output/format.js';
 import type { Context } from '../context.js';
+import { getSecret } from '../core/credentials.js';
+import { ExitCode, KiteCliError, UsageError } from '../core/errors.js';
+import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js';
+import { MAX_INSTRUMENTS_PER_CONNECTION, type Tick, Ticker, type TickerMode } from '../core/ticker.js';
+import { compactNumber, money, percent, timeOnly } from '../output/format.js';
+import { type Column, renderTable } from '../output/table.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -39,7 +39,13 @@ export const watchCommands: CommandFactory = (program, run) => {
 
 async function watch(
   ctx: Context,
-  opts: { holdings?: boolean; positions?: boolean; mode?: string; fps?: string; orders?: boolean },
+  opts: {
+    holdings?: boolean;
+    positions?: boolean;
+    mode?: string;
+    fps?: string;
+    orders?: boolean;
+  },
   command: { args: string[] },
 ): Promise<void> {
   ctx.requireSession();
@@ -124,13 +130,21 @@ async function streamJson(
 ): Promise<void> {
   ticker.on('ticks', (ticks) => {
     for (const tick of ticks) {
-      ctx.io.writeJson({ ...tick, instrument: tokenToKey.get(tick.instrumentToken) });
+      ctx.io.writeJson({
+        ...tick,
+        instrument: tokenToKey.get(tick.instrumentToken),
+      });
     }
   });
   if (showOrders) {
     ticker.on('orderUpdate', (order) => ctx.io.writeJson({ type: 'order', data: order }));
   }
-  ticker.on('connect', () => ticker.subscribe(watchlist.map((w) => w.token), mode));
+  ticker.on('connect', () =>
+    ticker.subscribe(
+      watchlist.map((w) => w.token),
+      mode,
+    ),
+  );
 
   // An EventEmitter with no 'error' listener RETHROWS the error, which here
   // would escape the socket callback and take the process down mid-stream.
@@ -160,7 +174,7 @@ async function streamDashboard(
   ctx: Context,
   ticker: Ticker,
   watchlist: Array<{ key: string; token: number }>,
-  tokenToKey: Map<number, string>,
+  _tokenToKey: Map<number, string>,
   mode: TickerMode,
   opts: { fps?: string; orders?: boolean },
 ): Promise<void> {
@@ -177,7 +191,10 @@ async function streamDashboard(
 
   ticker.on('connect', () => {
     status = 'live';
-    ticker.subscribe(watchlist.map((w) => w.token), mode);
+    ticker.subscribe(
+      watchlist.map((w) => w.token),
+      mode,
+    );
   });
   ticker.on('reconnect', ({ attempt, delayMs }) => {
     status = `reconnecting (attempt ${attempt}, ${Math.round(delayMs / 1000)}s)`;
@@ -210,7 +227,11 @@ async function streamDashboard(
 
   if (opts.orders) {
     ticker.on('orderUpdate', (payload) => {
-      const order = payload as { tradingsymbol?: string; status?: string; filled_quantity?: number };
+      const order = payload as {
+        tradingsymbol?: string;
+        status?: string;
+        filled_quantity?: number;
+      };
       orderLog.unshift(
         `${timeOnly(new Date())}  ${order.tradingsymbol ?? '?'}  ${order.status ?? '?'}  ${order.filled_quantity ?? 0} filled`,
       );
@@ -251,13 +272,26 @@ async function streamDashboard(
       },
       {
         header: 'Change',
-        value: (r, io) => (r.tick?.change === undefined ? io.dim('—') : io.signed(r.tick.change, percent(r.tick.change))),
+        value: (r, io) =>
+          r.tick?.change === undefined ? io.dim('—') : io.signed(r.tick.change, percent(r.tick.change)),
         align: 'right',
       },
-      { header: 'Open', value: (r) => money(r.tick?.ohlc?.open), align: 'right' },
-      { header: 'High', value: (r) => money(r.tick?.ohlc?.high), align: 'right' },
+      {
+        header: 'Open',
+        value: (r) => money(r.tick?.ohlc?.open),
+        align: 'right',
+      },
+      {
+        header: 'High',
+        value: (r) => money(r.tick?.ohlc?.high),
+        align: 'right',
+      },
       { header: 'Low', value: (r) => money(r.tick?.ohlc?.low), align: 'right' },
-      { header: 'Close', value: (r) => money(r.tick?.ohlc?.close), align: 'right' },
+      {
+        header: 'Close',
+        value: (r) => money(r.tick?.ohlc?.close),
+        align: 'right',
+      },
       ...(mode !== 'ltp'
         ? [
             {
@@ -270,7 +304,11 @@ async function streamDashboard(
     ];
 
     const statusColour =
-      status === 'live' ? io.green('● live') : status.startsWith('error') ? io.red(`● ${status}`) : io.yellow(`● ${status}`);
+      status === 'live'
+        ? io.green('● live')
+        : status.startsWith('error')
+          ? io.red(`● ${status}`)
+          : io.yellow(`● ${status}`);
 
     const parts = [
       `${statusColour}  ${io.dim(`${watchlist.length} instruments · ${mode} mode · ${lastUpdate ? timeOnly(lastUpdate) : 'waiting for data'}`)}`,

@@ -1,12 +1,20 @@
-import { KiteClient } from './core/client.js';
 import { KiteApi } from './core/api.js';
+import { KiteClient } from './core/client.js';
+import {
+  type Config,
+  type Endpoints,
+  type Environment,
+  endpointsFor,
+  loadConfig,
+  resolveEnv,
+  SANDBOX_CREDENTIALS,
+} from './core/config.js';
+import { getSecret } from './core/credentials.js';
+import { AuthRequiredError, ExitCode, KiteCliError } from './core/errors.js';
 import { InstrumentStore } from './core/instruments.js';
 import { RateLimiter } from './core/ratelimit.js';
-import { loadConfig, resolveEnv, endpointsFor, SANDBOX_CREDENTIALS, type Config, type Environment, type Endpoints } from './core/config.js';
-import { getSecret } from './core/credentials.js';
-import { loadSessionMeta, isExpired, type SessionMeta } from './core/session.js';
-import { AuthRequiredError, KiteCliError, ExitCode } from './core/errors.js';
 import { registerSecret } from './core/redact.js';
+import { isExpired, loadSessionMeta, type SessionMeta } from './core/session.js';
 import { Io, type IoStreams } from './output/io.js';
 
 /**
@@ -84,9 +92,7 @@ export async function createContext(
   const requireSession = (): SessionMeta => {
     if (!client.hasSession()) {
       throw new AuthRequiredError(
-        env === 'sandbox'
-          ? 'No sandbox session. Run `kite login --env sandbox`.'
-          : 'Not logged in.',
+        env === 'sandbox' ? 'No sandbox session. Run `kite login --env sandbox`.' : 'Not logged in.',
       );
     }
     // A session file is absent when credentials came from the environment,

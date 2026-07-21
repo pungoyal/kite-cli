@@ -1,29 +1,29 @@
 import { z } from 'zod';
 import type { KiteClient } from './client.js';
+import { UsageError } from './errors.js';
 import {
-  ProfileSchema,
-  MarginsSchema,
-  OrderSchema,
-  TradeSchema,
-  PlaceOrderResultSchema,
-  HoldingSchema,
-  PositionsSchema,
   AuctionSchema,
-  QuoteMapSchema,
-  LtpMapSchema,
-  OhlcMapSchema,
-  CandlesSchema,
-  GttSchema,
-  GttCreateResultSchema,
-  OrderMarginSchema,
   BasketMarginSchema,
+  type Candle,
+  CandlesSchema,
+  GttCreateResultSchema,
+  GttSchema,
+  HoldingSchema,
+  LtpMapSchema,
+  MarginsSchema,
   MfHoldingSchema,
   MfOrderSchema,
   MfSipSchema,
+  OhlcMapSchema,
+  OrderMarginSchema,
+  OrderSchema,
+  PlaceOrderResultSchema,
+  PositionsSchema,
+  ProfileSchema,
+  QuoteMapSchema,
   SessionSchema,
-  type Candle,
+  TradeSchema,
 } from './schemas.js';
-import { UsageError } from './errors.js';
 
 /**
  * Typed wrappers over the Kite Connect v3 endpoints.
@@ -116,11 +116,21 @@ export class KiteApi {
   }
 
   async getProfile(signal?: AbortSignal) {
-    return this.client.request({ method: 'GET', path: '/user/profile', schema: ProfileSchema, signal });
+    return this.client.request({
+      method: 'GET',
+      path: '/user/profile',
+      schema: ProfileSchema,
+      signal,
+    });
   }
 
   async getMargins(signal?: AbortSignal) {
-    return this.client.request({ method: 'GET', path: '/user/margins', schema: MarginsSchema, signal });
+    return this.client.request({
+      method: 'GET',
+      path: '/user/margins',
+      schema: MarginsSchema,
+      signal,
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -594,10 +604,7 @@ export function parseInterval(value: string): HistoricalInterval {
   if ((HISTORICAL_INTERVALS as readonly string[]).includes(value)) {
     return value as HistoricalInterval;
   }
-  throw new UsageError(
-    `Unknown interval "${value}".`,
-    `Supported intervals: ${HISTORICAL_INTERVALS.join(', ')}.`,
-  );
+  throw new UsageError(`Unknown interval "${value}".`, `Supported intervals: ${HISTORICAL_INTERVALS.join(', ')}.`);
 }
 
 const DAY_MS = 86_400_000;

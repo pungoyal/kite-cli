@@ -109,15 +109,33 @@ export class Io {
     return this.colorEnabled ? fn(text) : text;
   }
 
-  bold(text: string): string { return this.paint(pc.bold, text); }
-  dim(text: string): string { return this.paint(pc.dim, text); }
-  red(text: string): string { return this.paint(pc.red, text); }
-  green(text: string): string { return this.paint(pc.green, text); }
-  yellow(text: string): string { return this.paint(pc.yellow, text); }
-  blue(text: string): string { return this.paint(pc.blue, text); }
-  cyan(text: string): string { return this.paint(pc.cyan, text); }
-  magenta(text: string): string { return this.paint(pc.magenta, text); }
-  gray(text: string): string { return this.paint(pc.gray, text); }
+  bold(text: string): string {
+    return this.paint(pc.bold, text);
+  }
+  dim(text: string): string {
+    return this.paint(pc.dim, text);
+  }
+  red(text: string): string {
+    return this.paint(pc.red, text);
+  }
+  green(text: string): string {
+    return this.paint(pc.green, text);
+  }
+  yellow(text: string): string {
+    return this.paint(pc.yellow, text);
+  }
+  blue(text: string): string {
+    return this.paint(pc.blue, text);
+  }
+  cyan(text: string): string {
+    return this.paint(pc.cyan, text);
+  }
+  magenta(text: string): string {
+    return this.paint(pc.magenta, text);
+  }
+  gray(text: string): string {
+    return this.paint(pc.gray, text);
+  }
 
   /** Green for positive, red for negative, plain for zero. */
   signed(value: number, text: string): string {

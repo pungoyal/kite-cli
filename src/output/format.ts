@@ -114,9 +114,7 @@ function toDate(value: Date | string | undefined | null): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   // Kite returns "YYYY-MM-DD HH:MM:SS" without a zone in most responses
   // (implicitly IST), but ISO-8601 with +0530 for historical candles.
-  const normalised = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
-    ? `${value.replace(' ', 'T')}+05:30`
-    : value;
+  const normalised = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? `${value.replace(' ', 'T')}+05:30` : value;
   const parsed = new Date(normalised);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

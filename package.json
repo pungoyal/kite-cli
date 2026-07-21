@@ -45,6 +45,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
+    "hooks:install": "git config core.hooksPath .githooks",
     "check:deps": "node scripts/check-deps.mjs",
     "lint:publish": "publint && attw --pack . --profile esm-only",
     "check:dist": "node -e \"const{existsSync,readFileSync}=require('node:fs');if(!existsSync('dist/cli.js'))throw new Error('dist/ is missing — run npm run build before publishing');if(!readFileSync('dist/cli.js','utf8').startsWith('#!/usr/bin/env node'))throw new Error('dist/cli.js lost its shebang')\"",
@@ -64,6 +68,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.0",
+    "@biomejs/biome": "^2.5.4",
     "@types/node": "^22.15.0",
     "@types/ws": "^8.18.0",
     "@vitest/coverage-v8": "^4.1.10",

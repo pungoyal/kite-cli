@@ -14,9 +14,15 @@ outrank features. ESM-only, Node ≥ 22.12.
 npm run dev -- <args>   # run the CLI from source (e.g. npm run dev -- holdings)
 npm test                # vitest: unit + in-process E2E + built-binary smoke
 npm run typecheck       # tsc --noEmit over src + test + configs
+npm run lint            # Biome format + lint check (read-only; CI runs `biome ci`)
+npm run lint:fix        # Biome auto-fix
 npm run build           # tsc -> dist/ (published build; no source maps)
 npm run lint:publish    # publint + are-the-types-wrong on the packed tarball
 ```
+
+Formatting/linting is Biome (`biome.json`): 2-space, single quotes, semicolons,
+trailing commas, width 120. `noNonNullAssertion` and `useLiteralKeys` are disabled
+by design. Pre-commit hook lives in `.githooks/` — enable with `npm run hooks:install`.
 
 Tests must run with `TZ=Asia/Kolkata` (vitest config pins this). Use `--env sandbox`
 for anything that would otherwise touch a real account.

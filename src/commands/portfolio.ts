@@ -1,11 +1,11 @@
-import { Command } from 'commander';
-import { printTable, renderKeyValue, heading, type Column } from '../output/table.js';
-import { rupees, signedRupees, percent, quantity, compactRupees, money } from '../output/format.js';
-import { confirmAction } from '../safety.js';
-import { UsageError } from '../core/errors.js';
-import { PRODUCTS, type Product, type TransactionType } from '../core/api.js';
-import type { Holding, Position, SegmentMargin } from '../core/schemas.js';
+import type { Command } from 'commander';
 import type { Context } from '../context.js';
+import { PRODUCTS, type Product, type TransactionType } from '../core/api.js';
+import { UsageError } from '../core/errors.js';
+import type { Holding, Position, SegmentMargin } from '../core/schemas.js';
+import { money, percent, quantity, rupees, signedRupees } from '../output/format.js';
+import { type Column, heading, printTable, renderKeyValue } from '../output/table.js';
+import { confirmAction } from '../safety.js';
 import type { CommandFactory } from './types.js';
 
 export const portfolioCommands: CommandFactory = (program, run) => {
@@ -61,7 +61,11 @@ async function holdings(ctx: Context, opts: { sort?: string }): Promise<void> {
   const columns: Array<Column<Holding>> = [
     { header: 'Symbol', value: (h, io) => io.bold(h.tradingsymbol) },
     { header: 'Exch', value: (h) => h.exchange },
-    { header: 'Qty', value: (h) => quantity(h.quantity + h.t1_quantity), align: 'right' },
+    {
+      header: 'Qty',
+      value: (h) => quantity(h.quantity + h.t1_quantity),
+      align: 'right',
+    },
     { header: 'Avg', value: (h) => money(h.average_price), align: 'right' },
     { header: 'LTP', value: (h) => money(h.last_price), align: 'right' },
     {
@@ -102,7 +106,13 @@ async function holdings(ctx: Context, opts: { sort?: string }): Promise<void> {
     renderKeyValue(io, [
       ['Invested', rupees(totalInvested)],
       ['Current', rupees(totalCurrent)],
-      ['P&L', io.signed(totalPnl, `${signedRupees(totalPnl)}  ${percent(totalInvested === 0 ? 0 : (totalPnl / totalInvested) * 100)}`)],
+      [
+        'P&L',
+        io.signed(
+          totalPnl,
+          `${signedRupees(totalPnl)}  ${percent(totalInvested === 0 ? 0 : (totalPnl / totalInvested) * 100)}`,
+        ),
+      ],
       ["Day's change", io.signed(totalDayChange, signedRupees(totalDayChange))],
     ]),
   );
@@ -119,10 +129,7 @@ function sorter(field: string): (a: Holding, b: Holding) => number {
     case 'value':
       return (a, b) => b.last_price * b.quantity - a.last_price * a.quantity;
     default:
-      throw new UsageError(
-        `Unknown sort field "${field}".`,
-        'Valid fields: symbol, value, pnl, day.',
-      );
+      throw new UsageError(`Unknown sort field "${field}".`, 'Valid fields: symbol, value, pnl, day.');
   }
 }
 
@@ -171,9 +178,7 @@ async function positions(ctx: Context, opts: { day?: boolean }): Promise<void> {
   const open = rows.filter((p) => p.quantity !== 0);
   if (open.length > 0 && !opts.day) {
     io.note('');
-    io.info(
-      'To exit a position, place an opposite order with the SAME product — otherwise it opens a new position.',
-    );
+    io.info('To exit a position, place an opposite order with the SAME product — otherwise it opens a new position.');
   }
 }
 
@@ -207,10 +212,7 @@ async function funds(ctx: Context, opts: { segment?: string }): Promise<void> {
         ['SPAN', rupees(segment.utilised?.span)],
         ['Exposure', rupees(segment.utilised?.exposure)],
         ['Option premium', rupees(segment.utilised?.option_premium)],
-        [
-          'Realised P&L',
-          io.signed(segment.utilised?.m2m_realised ?? 0, signedRupees(segment.utilised?.m2m_realised)),
-        ],
+        ['Realised P&L', io.signed(segment.utilised?.m2m_realised ?? 0, signedRupees(segment.utilised?.m2m_realised))],
         [
           'Unrealised P&L',
           io.signed(segment.utilised?.m2m_unrealised ?? 0, signedRupees(segment.utilised?.m2m_unrealised)),
@@ -227,11 +229,7 @@ async function funds(ctx: Context, opts: { segment?: string }): Promise<void> {
  * complete in a browser. We request an id, then hand them the URL. The
  * authorisation is valid until 5:30 PM the same day.
  */
-async function authoriseHoldings(
-  ctx: Context,
-  _opts: unknown,
-  command: { args: string[] },
-): Promise<void> {
+async function authoriseHoldings(ctx: Context, _opts: unknown, command: { args: string[] }): Promise<void> {
   ctx.requireSession();
   const isins = command.args.map((isin) => isin.trim().toUpperCase()).filter(Boolean);
 
@@ -328,7 +326,13 @@ async function convertPosition(
   );
 
   if (ctx.io.json) {
-    ctx.io.writeJson({ converted: true, tradingsymbol: parsed.tradingsymbol, from, to, quantity: qty });
+    ctx.io.writeJson({
+      converted: true,
+      tradingsymbol: parsed.tradingsymbol,
+      from,
+      to,
+      quantity: qty,
+    });
     return;
   }
   ctx.io.success(`Converted ${qty} ${parsed.tradingsymbol} from ${from} to ${to}.`);

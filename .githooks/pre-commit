@@ -1,0 +1,16 @@
+#!/bin/sh
+# Pre-commit: format-check and lint the staged files with Biome.
+#
+# Enable once per clone with:  npm run hooks:install
+# (git does not run repo-committed hooks until core.hooksPath is set, and this
+# project's .npmrc sets ignore-scripts=true, so there is no auto-install.)
+#
+# This only checks — it never rewrites files mid-commit. Fix issues with
+# `npm run lint:fix`, then stage and commit again.
+
+if ! command -v npx >/dev/null 2>&1; then
+  echo "pre-commit: npx not found; skipping Biome check." >&2
+  exit 0
+fi
+
+exec npx biome check --staged --no-errors-on-unmatched

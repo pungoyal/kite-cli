@@ -1,9 +1,9 @@
 import { Command, CommanderError } from 'commander';
+import type { Handler } from './commands/types.js';
 import { createContext, type GlobalOptions } from './context.js';
-import { KiteCliError, ExitCode, AbortedError, type ExitCodeValue } from './core/errors.js';
+import { AbortedError, ExitCode, type ExitCodeValue, KiteCliError } from './core/errors.js';
 import { redactString } from './core/redact.js';
 import { Io, type IoStreams } from './output/io.js';
-import type { Handler } from './commands/types.js';
 
 export interface RunOptions {
   argv?: string[];

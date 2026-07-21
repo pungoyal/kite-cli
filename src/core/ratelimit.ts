@@ -14,7 +14,7 @@
  * enforces pacing.
  */
 
-import { KiteCliError, ExitCode } from './errors.js';
+import { ExitCode, KiteCliError } from './errors.js';
 
 export type RateCategory = 'quote' | 'historical' | 'order' | 'default';
 
@@ -207,7 +207,10 @@ export class RateLimiter {
 
   /** Orders placed by this process in the current minute / IST day. */
   orderUsage(): { minute: number; day: number } {
-    return { minute: this.orderCounters.minuteCount, day: this.orderCounters.dayCount };
+    return {
+      minute: this.orderCounters.minuteCount,
+      day: this.orderCounters.dayCount,
+    };
   }
 
   /** True if this process is approaching a documented order cap. */

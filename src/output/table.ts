@@ -24,12 +24,7 @@ export interface TableOptions {
   empty?: string;
 }
 
-export function renderTable<T>(
-  io: Io,
-  rows: readonly T[],
-  columns: Array<Column<T>>,
-  opts: TableOptions = {},
-): string {
+export function renderTable<T>(io: Io, rows: readonly T[], columns: Array<Column<T>>, opts: TableOptions = {}): string {
   if (rows.length === 0) {
     return io.dim(opts.empty ?? 'Nothing to show.');
   }
@@ -108,9 +103,7 @@ const COMPACT_CHARS = {
 /** A borderless key/value block, for detail views. */
 export function renderKeyValue(io: Io, entries: Array<[string, string]>): string {
   const width = Math.max(...entries.map(([key]) => key.length));
-  return entries
-    .map(([key, value]) => `  ${io.dim(key.padEnd(width))}  ${value}`)
-    .join('\n');
+  return entries.map(([key, value]) => `  ${io.dim(key.padEnd(width))}  ${value}`).join('\n');
 }
 
 /** A section heading. */

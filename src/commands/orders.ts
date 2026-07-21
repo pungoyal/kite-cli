@@ -1,23 +1,23 @@
 import { z } from 'zod';
-import { printTable, renderTable, renderKeyValue, heading, type Column } from '../output/table.js';
-import { money, rupees, quantity, dateTime, timeOnly } from '../output/format.js';
-import { confirmAction, buildOrderTag, assertTradingEnabled } from '../safety.js';
-import { parseInstrumentKey, formatInstrumentKey } from '../core/instruments.js';
-import { UsageError, KiteCliError, KiteApiError, ExitCode, NetworkError } from '../core/errors.js';
-import {
-  VARIETIES,
-  ORDER_TYPES,
-  PRODUCTS,
-  VALIDITIES,
-  type Variety,
-  type OrderType,
-  type Product,
-  type Validity,
-  type TransactionType,
-  type PlaceOrderParams,
-} from '../core/api.js';
-import { TERMINAL_ORDER_STATUSES, type Order, type Trade } from '../core/schemas.js';
 import type { Context } from '../context.js';
+import {
+  ORDER_TYPES,
+  type OrderType,
+  type PlaceOrderParams,
+  PRODUCTS,
+  type Product,
+  type TransactionType,
+  VALIDITIES,
+  VARIETIES,
+  type Validity,
+  type Variety,
+} from '../core/api.js';
+import { ExitCode, KiteApiError, KiteCliError, NetworkError, UsageError } from '../core/errors.js';
+import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js';
+import { type Order, TERMINAL_ORDER_STATUSES, type Trade } from '../core/schemas.js';
+import { dateTime, money, quantity, rupees, timeOnly } from '../output/format.js';
+import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
+import { assertTradingEnabled, buildOrderTag, confirmAction } from '../safety.js';
 import type { CommandFactory } from './types.js';
 
 export const orderCommands: CommandFactory = (program, run) => {
@@ -73,10 +73,7 @@ export const orderCommands: CommandFactory = (program, run) => {
     .option('--variety <variety>', 'Order variety (inferred from the orderbook if omitted)')
     .action(run(cancelOrder));
 
-  program
-    .command('trades')
-    .description("Show today's executed trades")
-    .action(run(listTrades));
+  program.command('trades').description("Show today's executed trades").action(run(listTrades));
 };
 
 // ---------------------------------------------------------------------------
@@ -111,7 +108,11 @@ function orderColumns(): Array<Column<Order>> {
       value: (o) => `${quantity(o.filled_quantity ?? 0)}/${quantity(o.quantity ?? 0)}`,
       align: 'right',
     },
-    { header: 'Price', value: (o) => money(o.average_price || o.price), align: 'right' },
+    {
+      header: 'Price',
+      value: (o) => money(o.average_price || o.price),
+      align: 'right',
+    },
     { header: 'Status', value: (o, io) => colourStatus(io, o.status) },
   ];
 }
@@ -172,8 +173,16 @@ async function getOrder(ctx: Context, _opts: unknown, command: { args: string[] 
     renderTableFor(ctx, history, [
       { header: 'Time', value: (o) => timeOnly(o.order_timestamp) },
       { header: 'Status', value: (o, io) => colourStatus(io, o.status) },
-      { header: 'Filled', value: (o) => quantity(o.filled_quantity ?? 0), align: 'right' },
-      { header: 'Pending', value: (o) => quantity(o.pending_quantity ?? 0), align: 'right' },
+      {
+        header: 'Filled',
+        value: (o) => quantity(o.filled_quantity ?? 0),
+        align: 'right',
+      },
+      {
+        header: 'Pending',
+        value: (o) => quantity(o.pending_quantity ?? 0),
+        align: 'right',
+      },
       { header: 'Message', value: (o) => o.status_message ?? '' },
     ]),
   );
@@ -196,7 +205,10 @@ async function listTrades(ctx: Context): Promise<void> {
 
 function tradeColumns(): Array<Column<Trade>> {
   return [
-    { header: 'Time', value: (t) => timeOnly(t.fill_timestamp ?? t.exchange_timestamp) },
+    {
+      header: 'Time',
+      value: (t) => timeOnly(t.fill_timestamp ?? t.exchange_timestamp),
+    },
     { header: 'Trade ID', value: (t, io) => io.dim(t.trade_id) },
     { header: 'Symbol', value: (t, io) => io.bold(t.tradingsymbol ?? '—') },
     {
@@ -236,14 +248,14 @@ const PlaceOptionsSchema = z.object({
   disclosedQuantity: z.coerce.number().int().nonnegative().optional(),
   icebergLegs: z.coerce.number().int().min(2).max(50).optional(),
   icebergQuantity: z.coerce.number().int().positive().optional(),
-  tag: z.string().max(20).regex(/^[a-zA-Z0-9]*$/, 'Tag must be alphanumeric.').optional(),
+  tag: z
+    .string()
+    .max(20)
+    .regex(/^[a-zA-Z0-9]*$/, 'Tag must be alphanumeric.')
+    .optional(),
 });
 
-async function placeOrder(
-  ctx: Context,
-  rawOpts: unknown,
-  command: { args: string[] },
-): Promise<void> {
+async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: string[] }): Promise<void> {
   ctx.requireSession();
   assertTradingEnabled(ctx);
 
@@ -333,13 +345,29 @@ async function placeOrder(
       { label: 'Instrument', value: instrumentKey },
       ...(resolved
         ? [
-            { label: 'Resolved', value: `${resolved.name ?? resolved.tradingsymbol} (token ${resolved.instrument_token})` },
+            {
+              label: 'Resolved',
+              value: `${resolved.name ?? resolved.tradingsymbol} (token ${resolved.instrument_token})`,
+            },
             ...(resolved.lot_size && resolved.lot_size > 1
-              ? [{ label: 'Lot size', value: `${resolved.lot_size} (${opts.quantity / resolved.lot_size} lots)` }]
+              ? [
+                  {
+                    label: 'Lot size',
+                    value: `${resolved.lot_size} (${opts.quantity / resolved.lot_size} lots)`,
+                  },
+                ]
               : []),
           ]
-        : [{ label: 'Resolved', value: ctx.io.yellow('not in the local instrument cache') }]),
-      { label: 'Side', value: side === 'BUY' ? ctx.io.green(side) : ctx.io.red(side) },
+        : [
+            {
+              label: 'Resolved',
+              value: ctx.io.yellow('not in the local instrument cache'),
+            },
+          ]),
+      {
+        label: 'Side',
+        value: side === 'BUY' ? ctx.io.green(side) : ctx.io.red(side),
+      },
       { label: 'Quantity', value: quantity(opts.quantity) },
       { label: 'Order type', value: orderType },
       ...(opts.price !== undefined ? [{ label: 'Price', value: rupees(opts.price) }] : []),
@@ -382,7 +410,7 @@ async function placeOrder(
     ctx.io.warn(`Approaching Kite's order caps this session (${usage.minute}/min, ${usage.day}/day).`);
   }
 
-  let result;
+  let result: Awaited<ReturnType<typeof ctx.api.placeOrder>>;
   try {
     result = await ctx.api.placeOrder(params, ctx.signal);
   } catch (err) {
@@ -472,7 +500,11 @@ async function reconcileAfterFailure(ctx: Context, tag: string, cause: Error): P
     if (matches.length > 0) {
       const order = matches[0]!;
       if (io.json) {
-        ctx.io.writeJson({ order_ids: matches.map((o) => o.order_id), tag, reconciled: true });
+        ctx.io.writeJson({
+          order_ids: matches.map((o) => o.order_id),
+          tag,
+          reconciled: true,
+        });
         return;
       }
       io.warn(`The order DID reach Kite: ${io.bold(order.order_id)} (${order.status}).`);
@@ -521,19 +553,28 @@ async function modifyOrder(
   if (!orderId) throw new UsageError('An order ID is required.');
 
   const lookup = await findOrder(ctx, orderId);
-  const variety = resolveVariety(ctx, lookup, opts.variety, orderId, 'Modifying');
+  const variety = resolveVariety(lookup, opts.variety, orderId, 'Modifying');
   const existing = lookup.status === 'found' ? lookup.order : undefined;
 
   const changes: Array<{ label: string; value: string }> = [];
-  const params: Parameters<typeof ctx.api.modifyOrder>[0] = { variety, order_id: orderId };
+  const params: Parameters<typeof ctx.api.modifyOrder>[0] = {
+    variety,
+    order_id: orderId,
+  };
 
   if (opts.quantity !== undefined) {
     params.quantity = requirePositiveInt(opts.quantity, '--quantity');
-    changes.push({ label: 'Quantity', value: `${quantity(existing?.quantity)} → ${quantity(params.quantity)}` });
+    changes.push({
+      label: 'Quantity',
+      value: `${quantity(existing?.quantity)} → ${quantity(params.quantity)}`,
+    });
   }
   if (opts.price !== undefined) {
     params.price = requirePositiveNumber(opts.price, '--price');
-    changes.push({ label: 'Price', value: `${money(existing?.price)} → ${money(params.price)}` });
+    changes.push({
+      label: 'Price',
+      value: `${money(existing?.price)} → ${money(params.price)}`,
+    });
   }
   if (opts.triggerPrice !== undefined) {
     params.trigger_price = requirePositiveNumber(opts.triggerPrice, '--trigger-price');
@@ -544,15 +585,23 @@ async function modifyOrder(
   }
   if (opts.type !== undefined) {
     params.order_type = normalise(opts.type, ORDER_TYPES, 'order type') as OrderType;
-    changes.push({ label: 'Order type', value: `${existing?.order_type ?? '—'} → ${params.order_type}` });
+    changes.push({
+      label: 'Order type',
+      value: `${existing?.order_type ?? '—'} → ${params.order_type}`,
+    });
   }
   if (opts.validity !== undefined) {
     params.validity = normalise(opts.validity, VALIDITIES, 'validity') as Validity;
-    changes.push({ label: 'Validity', value: `${existing?.validity ?? '—'} → ${params.validity}` });
+    changes.push({
+      label: 'Validity',
+      value: `${existing?.validity ?? '—'} → ${params.validity}`,
+    });
   }
 
   if (changes.length === 0) {
-    throw new UsageError('Nothing to modify. Pass at least one of --quantity, --price, --trigger-price, --type or --validity.');
+    throw new UsageError(
+      'Nothing to modify. Pass at least one of --quantity, --price, --trigger-price, --type or --validity.',
+    );
   }
 
   // Price the modified order for the cap and escalation checks.
@@ -588,8 +637,7 @@ async function modifyOrder(
   // prove it is a reduction, so we fail closed and treat it as increasing.
   const raisesQuantity =
     params.quantity !== undefined && (existing?.quantity === undefined || params.quantity > existing.quantity);
-  const raisesPrice =
-    params.price !== undefined && (existing?.price === undefined || params.price > existing.price);
+  const raisesPrice = params.price !== undefined && (existing?.price === undefined || params.price > existing.price);
   const loosensType = params.order_type === 'MARKET' || params.order_type === 'SL-M';
   const increasesExposure = raisesQuantity || raisesPrice || loosensType;
 
@@ -601,7 +649,10 @@ async function modifyOrder(
     challengeToken: existing?.tradingsymbol,
     details: [
       { label: 'Order ID', value: orderId },
-      { label: 'Symbol', value: existing ? `${existing.exchange}:${existing.tradingsymbol}` : 'unknown' },
+      {
+        label: 'Symbol',
+        value: existing ? `${existing.exchange}:${existing.tradingsymbol}` : 'unknown',
+      },
       { label: 'Status', value: existing?.status ?? 'unknown' },
       { label: 'Variety', value: variety },
       ...changes,
@@ -621,11 +672,7 @@ async function modifyOrder(
   ctx.io.info('Kite allows at most 25 modifications per order.');
 }
 
-async function cancelOrder(
-  ctx: Context,
-  opts: { variety?: string },
-  command: { args: string[] },
-): Promise<void> {
+async function cancelOrder(ctx: Context, opts: { variety?: string }, command: { args: string[] }): Promise<void> {
   ctx.requireSession();
   assertTradingEnabled(ctx);
 
@@ -633,14 +680,11 @@ async function cancelOrder(
   if (!orderId) throw new UsageError('An order ID is required.');
 
   const lookup = await findOrder(ctx, orderId);
-  const variety = resolveVariety(ctx, lookup, opts.variety, orderId, 'Cancelling');
+  const variety = resolveVariety(lookup, opts.variety, orderId, 'Cancelling');
   const existing = lookup.status === 'found' ? lookup.order : undefined;
 
   if (existing && TERMINAL_ORDER_STATUSES.has(existing.status)) {
-    throw new KiteCliError(
-      `Order ${orderId} is already ${existing.status} and cannot be cancelled.`,
-      ExitCode.Input,
-    );
+    throw new KiteCliError(`Order ${orderId} is already ${existing.status} and cannot be cancelled.`, ExitCode.Input);
   }
 
   await confirmAction(ctx, {
@@ -648,7 +692,10 @@ async function cancelOrder(
     mutatesOrders: true,
     details: [
       { label: 'Order ID', value: orderId },
-      { label: 'Symbol', value: existing ? `${existing.exchange}:${existing.tradingsymbol}` : 'unknown' },
+      {
+        label: 'Symbol',
+        value: existing ? `${existing.exchange}:${existing.tradingsymbol}` : 'unknown',
+      },
       { label: 'Side', value: existing?.transaction_type ?? 'unknown' },
       { label: 'Quantity', value: quantity(existing?.quantity) },
       { label: 'Status', value: existing?.status ?? 'unknown' },
@@ -659,7 +706,11 @@ async function cancelOrder(
   if (ctx.options.dryRun) return;
 
   const result = await ctx.api.cancelOrder(
-    { variety, order_id: orderId, ...(existing?.parent_order_id ? { parent_order_id: existing.parent_order_id } : {}) },
+    {
+      variety,
+      order_id: orderId,
+      ...(existing?.parent_order_id ? { parent_order_id: existing.parent_order_id } : {}),
+    },
     ctx.signal,
   );
 
@@ -702,13 +753,7 @@ async function findOrder(ctx: Context, orderId: string): Promise<OrderLookup> {
  * Fails closed when the orderbook could not be read and the user did not say
  * which variety it is — guessing 'regular' would target the wrong endpoint.
  */
-function resolveVariety(
-  ctx: Context,
-  lookup: OrderLookup,
-  explicit: string | undefined,
-  orderId: string,
-  verb: string,
-): Variety {
+function resolveVariety(lookup: OrderLookup, explicit: string | undefined, orderId: string, verb: string): Variety {
   if (explicit) return normalise(explicit, VARIETIES, 'variety', false) as Variety;
   if (lookup.status === 'found') return (lookup.order.variety ?? 'regular') as Variety;
 
@@ -746,5 +791,7 @@ function requirePositiveNumber(value: string, flag: string): number {
 }
 
 function renderTableFor<T>(ctx: Context, rows: readonly T[], columns: Array<Column<T>>): string {
-  return renderTable(ctx.io, rows, columns, { compact: ctx.config.output.compact });
+  return renderTable(ctx.io, rows, columns, {
+    compact: ctx.config.output.compact,
+  });
 }

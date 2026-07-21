@@ -1,7 +1,7 @@
-import { readFile, writeFile, chmod } from 'node:fs/promises';
+import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { configFile, configDir, ensurePrivateDir } from './paths.js';
-import { KiteCliError, ExitCode } from './errors.js';
+import { ExitCode, KiteCliError } from './errors.js';
+import { configDir, configFile, ensurePrivateDir } from './paths.js';
 
 /**
  * User configuration, persisted at ~/.config/kite/config.json.
@@ -97,7 +97,10 @@ export async function loadConfig(): Promise<Config> {
 export async function saveConfig(config: Config): Promise<void> {
   await ensurePrivateDir(configDir());
   const path = configFile();
-  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600, encoding: 'utf8' });
+  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, {
+    mode: 0o600,
+    encoding: 'utf8',
+  });
   if (process.platform !== 'win32') {
     await chmod(path, 0o600);
   }
@@ -116,17 +119,35 @@ export async function saveConfig(config: Config): Promise<void> {
 export const SETTABLE_KEYS = {
   apiKey: { type: 'string', description: 'Kite Connect API key' },
   env: { type: 'string', description: 'production or sandbox' },
-  'trading.enabled': { type: 'boolean', description: 'Master kill switch for all order commands' },
-  'trading.confirm': { type: 'boolean', description: 'Require confirmation before money-moving actions' },
-  'trading.maxOrderValue': { type: 'number', description: 'Refuse any single order above this rupee value' },
+  'trading.enabled': {
+    type: 'boolean',
+    description: 'Master kill switch for all order commands',
+  },
+  'trading.confirm': {
+    type: 'boolean',
+    description: 'Require confirmation before money-moving actions',
+  },
+  'trading.maxOrderValue': {
+    type: 'number',
+    description: 'Refuse any single order above this rupee value',
+  },
   'trading.strictConfirmAbove': {
     type: 'number',
     description: 'Above this rupee value, require typing the symbol to confirm',
   },
   'output.color': { type: 'string', description: 'auto, always, or never' },
-  'output.compact': { type: 'boolean', description: 'Render tables without borders' },
-  redirectPort: { type: 'number', description: 'Loopback port for the login callback' },
-  redirectPath: { type: 'string', description: 'Path component of the login callback URL' },
+  'output.compact': {
+    type: 'boolean',
+    description: 'Render tables without borders',
+  },
+  redirectPort: {
+    type: 'number',
+    description: 'Loopback port for the login callback',
+  },
+  redirectPath: {
+    type: 'string',
+    description: 'Path component of the login callback URL',
+  },
 } as const satisfies Record<string, { type: 'string' | 'number' | 'boolean'; description: string }>;
 
 export type SettableKey = keyof typeof SETTABLE_KEYS;
@@ -175,10 +196,7 @@ export function resolveEnv(flag: string | undefined, config: Config): Environmen
   const candidate = flag ?? process.env['KITE_ENV'] ?? config.env;
   const result = EnvironmentSchema.safeParse(candidate);
   if (!result.success) {
-    throw new KiteCliError(
-      `Unknown environment "${candidate}". Expected "production" or "sandbox".`,
-      ExitCode.Usage,
-    );
+    throw new KiteCliError(`Unknown environment "${candidate}". Expected "production" or "sandbox".`, ExitCode.Usage);
   }
   return result.data;
 }

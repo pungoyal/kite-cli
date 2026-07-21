@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  clearRegisteredSecrets,
+  maskSecret,
   redact,
   redactString,
   redactUrl,
   registerSecret,
-  clearRegisteredSecrets,
-  maskSecret,
 } from '../src/core/redact.js';
 
 /**
@@ -34,7 +34,10 @@ describe('the Authorization header', () => {
 
   it('is redacted inside a serialised headers object', () => {
     const redacted = redact({
-      headers: { Authorization: `token ${API_KEY}:${ACCESS_TOKEN}`, 'X-Kite-Version': '3' },
+      headers: {
+        Authorization: `token ${API_KEY}:${ACCESS_TOKEN}`,
+        'X-Kite-Version': '3',
+      },
     });
     expect(JSON.stringify(redacted)).not.toContain(ACCESS_TOKEN);
     // Non-secret headers survive, or debugging becomes impossible.
@@ -42,7 +45,9 @@ describe('the Authorization header', () => {
   });
 
   it('is redacted from a real Headers instance', () => {
-    const headers = new Headers({ Authorization: `token ${API_KEY}:${ACCESS_TOKEN}` });
+    const headers = new Headers({
+      Authorization: `token ${API_KEY}:${ACCESS_TOKEN}`,
+    });
     expect(JSON.stringify(redact(headers))).not.toContain(ACCESS_TOKEN);
   });
 });
@@ -76,7 +81,10 @@ describe('secret-bearing fields', () => {
   });
 
   it('redacts JSON fields', () => {
-    const json = JSON.stringify({ access_token: ACCESS_TOKEN, user_id: 'AB1234' });
+    const json = JSON.stringify({
+      access_token: ACCESS_TOKEN,
+      user_id: 'AB1234',
+    });
     const redacted = redactString(json);
     expect(redacted).not.toContain(ACCESS_TOKEN);
     expect(redacted).toContain('AB1234');
@@ -129,7 +137,10 @@ describe('non-plain objects survive the walk', () => {
    * so this silently destroys the data scripts consume.
    */
   it('serialises Dates to ISO strings rather than {}', () => {
-    const out = redact({ lastTradeTime: new Date('2026-07-20T10:00:00Z'), price: 1500 }) as Record<string, unknown>;
+    const out = redact({
+      lastTradeTime: new Date('2026-07-20T10:00:00Z'),
+      price: 1500,
+    }) as Record<string, unknown>;
     expect(out['lastTradeTime']).toBe('2026-07-20T10:00:00.000Z');
     expect(out['price']).toBe(1500);
   });
@@ -150,7 +161,9 @@ describe('non-plain objects survive the walk', () => {
   });
 
   it('summarises Buffers rather than dumping every byte index', () => {
-    expect(redact({ b: Buffer.alloc(184) })).toEqual({ b: '[buffer 184 bytes]' });
+    expect(redact({ b: Buffer.alloc(184) })).toEqual({
+      b: '[buffer 184 bytes]',
+    });
   });
 });
 
@@ -163,7 +176,12 @@ describe('robustness', () => {
   });
 
   it('preserves non-secret values', () => {
-    const input = { quantity: 10, symbol: 'INFY', price: 1500.5, nested: { ok: true } };
+    const input = {
+      quantity: 10,
+      symbol: 'INFY',
+      price: 1500.5,
+      nested: { ok: true },
+    };
     expect(redact(input)).toEqual(input);
   });
 

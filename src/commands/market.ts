@@ -1,10 +1,10 @@
-import { printTable, renderTable, renderKeyValue, heading, type Column } from '../output/table.js';
-import { money, percent, quantity, compactNumber, dateTime, parseUserDate, timeOnly } from '../output/format.js';
-import { parseInstrumentKey, formatInstrumentKey } from '../core/instruments.js';
-import { parseInterval, MAX_DAYS_PER_REQUEST, type HistoricalInterval } from '../core/api.js';
-import { UsageError } from '../core/errors.js';
-import type { Quote, Candle, Instrument } from '../core/schemas.js';
 import type { Context } from '../context.js';
+import { type HistoricalInterval, MAX_DAYS_PER_REQUEST, parseInterval } from '../core/api.js';
+import { UsageError } from '../core/errors.js';
+import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js';
+import type { Candle, Instrument, Quote } from '../core/schemas.js';
+import { compactNumber, dateTime, money, parseUserDate, percent, quantity, timeOnly } from '../output/format.js';
+import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
 import type { CommandFactory } from './types.js';
 
 export const marketCommands: CommandFactory = (program, run) => {
@@ -51,10 +51,7 @@ export const marketCommands: CommandFactory = (program, run) => {
     .option('-n, --limit <n>', 'Maximum results', '25')
     .action(run(searchCommand));
 
-  instruments
-    .command('refresh')
-    .description('Re-download the instrument master')
-    .action(run(refreshCommand));
+  instruments.command('refresh').description('Re-download the instrument master').action(run(refreshCommand));
 };
 
 async function quoteCommand(ctx: Context, opts: { depth?: boolean }, command: { args: string[] }): Promise<void> {
@@ -76,7 +73,11 @@ async function quoteCommand(ctx: Context, opts: { depth?: boolean }, command: { 
     const rows = entries.map(([key, q]) => ({ key, quote: q! }));
     const columns: Array<Column<{ key: string; quote: Quote }>> = [
       { header: 'Instrument', value: (r, io) => io.bold(r.key) },
-      { header: 'LTP', value: (r) => money(r.quote.last_price), align: 'right' },
+      {
+        header: 'LTP',
+        value: (r) => money(r.quote.last_price),
+        align: 'right',
+      },
       {
         header: 'Change',
         value: (r, io) => {
@@ -85,11 +86,27 @@ async function quoteCommand(ctx: Context, opts: { depth?: boolean }, command: { 
         },
         align: 'right',
       },
-      { header: 'Open', value: (r) => money(r.quote.ohlc?.open), align: 'right' },
-      { header: 'High', value: (r) => money(r.quote.ohlc?.high), align: 'right' },
+      {
+        header: 'Open',
+        value: (r) => money(r.quote.ohlc?.open),
+        align: 'right',
+      },
+      {
+        header: 'High',
+        value: (r) => money(r.quote.ohlc?.high),
+        align: 'right',
+      },
       { header: 'Low', value: (r) => money(r.quote.ohlc?.low), align: 'right' },
-      { header: 'Close', value: (r) => money(r.quote.ohlc?.close), align: 'right' },
-      { header: 'Volume', value: (r) => compactNumber(r.quote.volume), align: 'right' },
+      {
+        header: 'Close',
+        value: (r) => money(r.quote.ohlc?.close),
+        align: 'right',
+      },
+      {
+        header: 'Volume',
+        value: (r) => compactNumber(r.quote.volume),
+        align: 'right',
+      },
     ];
     io.line(renderTableOrEmpty(ctx, rows, columns));
     return;
@@ -131,12 +148,36 @@ function renderQuoteDetail(ctx: Context, key: string, quote: Quote, showDepth: b
     io.line('');
     io.line(
       renderTableOrEmpty(ctx, rows, [
-        { header: 'Bid Qty', value: (r) => quantity(r.bid?.quantity), align: 'right' },
-        { header: 'Orders', value: (r) => quantity(r.bid?.orders), align: 'right' },
-        { header: 'Bid', value: (r, io) => io.green(money(r.bid?.price)), align: 'right' },
-        { header: 'Ask', value: (r, io) => io.red(money(r.ask?.price)), align: 'right' },
-        { header: 'Orders', value: (r) => quantity(r.ask?.orders), align: 'right' },
-        { header: 'Ask Qty', value: (r) => quantity(r.ask?.quantity), align: 'right' },
+        {
+          header: 'Bid Qty',
+          value: (r) => quantity(r.bid?.quantity),
+          align: 'right',
+        },
+        {
+          header: 'Orders',
+          value: (r) => quantity(r.bid?.orders),
+          align: 'right',
+        },
+        {
+          header: 'Bid',
+          value: (r, io) => io.green(money(r.bid?.price)),
+          align: 'right',
+        },
+        {
+          header: 'Ask',
+          value: (r, io) => io.red(money(r.ask?.price)),
+          align: 'right',
+        },
+        {
+          header: 'Orders',
+          value: (r) => quantity(r.ask?.orders),
+          align: 'right',
+        },
+        {
+          header: 'Ask Qty',
+          value: (r) => quantity(r.ask?.quantity),
+          align: 'right',
+        },
       ]),
     );
   }
@@ -160,7 +201,11 @@ async function ltpCommand(ctx: Context, _opts: unknown, command: { args: string[
   ctx.io.line(
     renderTableOrEmpty(ctx, rows, [
       { header: 'Instrument', value: (r, io) => io.bold(r.key) },
-      { header: 'LTP', value: (r) => money(r.quote.last_price), align: 'right' },
+      {
+        header: 'LTP',
+        value: (r) => money(r.quote.last_price),
+        align: 'right',
+      },
     ]),
   );
 }
@@ -183,11 +228,27 @@ async function ohlcCommand(ctx: Context, _opts: unknown, command: { args: string
   ctx.io.line(
     renderTableOrEmpty(ctx, rows, [
       { header: 'Instrument', value: (r, io) => io.bold(r.key) },
-      { header: 'LTP', value: (r) => money(r.quote.last_price), align: 'right' },
-      { header: 'Open', value: (r) => money(r.quote.ohlc?.open), align: 'right' },
-      { header: 'High', value: (r) => money(r.quote.ohlc?.high), align: 'right' },
+      {
+        header: 'LTP',
+        value: (r) => money(r.quote.last_price),
+        align: 'right',
+      },
+      {
+        header: 'Open',
+        value: (r) => money(r.quote.ohlc?.open),
+        align: 'right',
+      },
+      {
+        header: 'High',
+        value: (r) => money(r.quote.ohlc?.high),
+        align: 'right',
+      },
       { header: 'Low', value: (r) => money(r.quote.ohlc?.low), align: 'right' },
-      { header: 'Close', value: (r) => money(r.quote.ohlc?.close), align: 'right' },
+      {
+        header: 'Close',
+        value: (r) => money(r.quote.ohlc?.close),
+        align: 'right',
+      },
       {
         header: 'Change',
         value: (r, io) => {
@@ -252,7 +313,12 @@ async function historyCommand(
   );
 
   if (ctx.io.json) {
-    ctx.io.writeJson({ instrument: key, instrument_token: token, interval, candles });
+    ctx.io.writeJson({
+      instrument: key,
+      instrument_token: token,
+      interval,
+      candles,
+    });
     return;
   }
 
@@ -272,9 +338,21 @@ async function historyCommand(
     { header: 'Open', value: (c) => money(c[1]), align: 'right' },
     { header: 'High', value: (c) => money(c[2]), align: 'right' },
     { header: 'Low', value: (c) => money(c[3]), align: 'right' },
-    { header: 'Close', value: (c, io) => io.signed(c[4] - c[1], money(c[4])), align: 'right' },
+    {
+      header: 'Close',
+      value: (c, io) => io.signed(c[4] - c[1], money(c[4])),
+      align: 'right',
+    },
     { header: 'Volume', value: (c) => compactNumber(c[5]), align: 'right' },
-    ...(opts.oi ? [{ header: 'OI', value: (c: Candle) => compactNumber(c[6]), align: 'right' as const }] : []),
+    ...(opts.oi
+      ? [
+          {
+            header: 'OI',
+            value: (c: Candle) => compactNumber(c[6]),
+            align: 'right' as const,
+          },
+        ]
+      : []),
   ];
 
   ctx.io.line(renderTableOrEmpty(ctx, shown, columns));
@@ -303,13 +381,24 @@ async function searchCommand(
   });
 
   const columns: Array<Column<Instrument>> = [
-    { header: 'Instrument', value: (i, io) => io.bold(formatInstrumentKey(i.exchange, i.tradingsymbol)) },
+    {
+      header: 'Instrument',
+      value: (i, io) => io.bold(formatInstrumentKey(i.exchange, i.tradingsymbol)),
+    },
     { header: 'Name', value: (i) => i.name ?? '—' },
     { header: 'Type', value: (i) => i.instrument_type ?? '—' },
     { header: 'Expiry', value: (i) => i.expiry || '—' },
-    { header: 'Strike', value: (i) => (i.strike ? money(i.strike) : '—'), align: 'right' },
+    {
+      header: 'Strike',
+      value: (i) => (i.strike ? money(i.strike) : '—'),
+      align: 'right',
+    },
     { header: 'Lot', value: (i) => quantity(i.lot_size), align: 'right' },
-    { header: 'Token', value: (i, io) => io.dim(String(i.instrument_token)), align: 'right' },
+    {
+      header: 'Token',
+      value: (i, io) => io.dim(String(i.instrument_token)),
+      align: 'right',
+    },
   ];
 
   printTable(ctx.io, results, columns, results, {
@@ -369,5 +458,7 @@ function changePercent(quote: Quote): number | undefined {
 }
 
 function renderTableOrEmpty<T>(ctx: Context, rows: readonly T[], columns: Array<Column<T>>): string {
-  return renderTable(ctx.io, rows, columns, { compact: ctx.config.output.compact });
+  return renderTable(ctx.io, rows, columns, {
+    compact: ctx.config.output.compact,
+  });
 }

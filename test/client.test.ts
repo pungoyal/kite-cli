@@ -1,11 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MockAgent, setGlobalDispatcher } from 'undici';
-import { z } from 'zod';
-import { KiteClient, setDispatcher } from '../src/core/client.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KiteApi } from '../src/core/api.js';
-import { KiteApiError, ExitCode } from '../src/core/errors.js';
-import { RateLimiter } from '../src/core/ratelimit.js';
+import { KiteClient, setDispatcher } from '../src/core/client.js';
 import { endpointsFor } from '../src/core/config.js';
+import { ExitCode, KiteApiError } from '../src/core/errors.js';
+import { RateLimiter } from '../src/core/ratelimit.js';
 
 /**
  * Client behaviour against a mocked transport.
@@ -49,7 +48,10 @@ describe('request signing', () => {
       .intercept({
         path: '/user/profile',
         method: 'GET',
-        headers: { 'X-Kite-Version': '3', Authorization: 'token testkey:testtoken' },
+        headers: {
+          'X-Kite-Version': '3',
+          Authorization: 'token testkey:testtoken',
+        },
       })
       .reply(200, { status: 'success', data: { user_id: 'AB1234' } });
 
@@ -78,9 +80,11 @@ describe('request signing', () => {
 
 describe('error mapping', () => {
   it('maps TokenException to the auth exit code', async () => {
-    pool()
-      .intercept({ path: '/user/profile', method: 'GET' })
-      .reply(403, { status: 'error', message: 'Invalid token', error_type: 'TokenException' });
+    pool().intercept({ path: '/user/profile', method: 'GET' }).reply(403, {
+      status: 'error',
+      message: 'Invalid token',
+      error_type: 'TokenException',
+    });
 
     const error = await new KiteApi(makeClient()).getProfile().catch((e) => e);
     expect(error).toBeInstanceOf(KiteApiError);
@@ -89,9 +93,11 @@ describe('error mapping', () => {
   });
 
   it('maps MarginException to the margin exit code', async () => {
-    pool()
-      .intercept({ path: '/orders/regular', method: 'POST' })
-      .reply(400, { status: 'error', message: 'Insufficient funds', error_type: 'MarginException' });
+    pool().intercept({ path: '/orders/regular', method: 'POST' }).reply(400, {
+      status: 'error',
+      message: 'Insufficient funds',
+      error_type: 'MarginException',
+    });
 
     const error = await new KiteApi(makeClient())
       .placeOrder({
@@ -109,13 +115,11 @@ describe('error mapping', () => {
   });
 
   it('maps HTTP 428 to the depository authorisation exit code', async () => {
-    pool()
-      .intercept({ path: '/orders/regular', method: 'POST' })
-      .reply(428, {
-        status: 'error',
-        message: '10 quantity needs authorisation at depository',
-        error_type: 'OrderException',
-      });
+    pool().intercept({ path: '/orders/regular', method: 'POST' }).reply(428, {
+      status: 'error',
+      message: '10 quantity needs authorisation at depository',
+      error_type: 'OrderException',
+    });
 
     const error = await new KiteApi(makeClient())
       .placeOrder({
@@ -155,9 +159,11 @@ describe('error mapping', () => {
   });
 
   it('handles HTTP 200 carrying status:error in the envelope', async () => {
-    pool()
-      .intercept({ path: '/user/profile', method: 'GET' })
-      .reply(200, { status: 'error', message: 'Something broke', error_type: 'GeneralException' });
+    pool().intercept({ path: '/user/profile', method: 'GET' }).reply(200, {
+      status: 'error',
+      message: 'Something broke',
+      error_type: 'GeneralException',
+    });
 
     const error = await new KiteApi(makeClient()).getProfile().catch((e) => e);
     expect(error).toBeInstanceOf(KiteApiError);
@@ -173,14 +179,12 @@ describe('error mapping', () => {
   });
 
   it('never leaks the access token in an error message', async () => {
-    pool()
-      .intercept({ path: '/user/profile', method: 'GET' })
-      .reply(400, {
-        status: 'error',
-        // A hostile or careless API echoing the token back at us.
-        message: 'Bad request with token testtoken',
-        error_type: 'InputException',
-      });
+    pool().intercept({ path: '/user/profile', method: 'GET' }).reply(400, {
+      status: 'error',
+      // A hostile or careless API echoing the token back at us.
+      message: 'Bad request with token testtoken',
+      error_type: 'InputException',
+    });
 
     const error = await new KiteApi(makeClient('testtoken')).getProfile().catch((e) => e);
     expect(error.message).not.toContain('testtoken');
@@ -193,7 +197,10 @@ describe('response validation', () => {
       .intercept({ path: '/user/profile', method: 'GET' })
       .reply(200, {
         status: 'success',
-        data: { user_id: 'AB1234', brand_new_field_kite_just_added: 'surprise' },
+        data: {
+          user_id: 'AB1234',
+          brand_new_field_kite_just_added: 'surprise',
+        },
       });
 
     const profile = await new KiteApi(makeClient()).getProfile();
@@ -226,7 +233,14 @@ describe('retry policy', () => {
       .intercept({ path: '/orders/regular', method: 'POST' })
       .reply(() => {
         attempts += 1;
-        return { statusCode: 503, data: { status: 'error', message: 'down', error_type: 'NetworkException' } };
+        return {
+          statusCode: 503,
+          data: {
+            status: 'error',
+            message: 'down',
+            error_type: 'NetworkException',
+          },
+        };
       })
       .times(4);
 
@@ -251,7 +265,14 @@ describe('retry policy', () => {
       .intercept({ path: /\/orders\/regular\/.*/, method: 'PUT' })
       .reply(() => {
         attempts += 1;
-        return { statusCode: 503, data: { status: 'error', message: 'down', error_type: 'NetworkException' } };
+        return {
+          statusCode: 503,
+          data: {
+            status: 'error',
+            message: 'down',
+            error_type: 'NetworkException',
+          },
+        };
       })
       .times(4);
 
@@ -268,13 +289,18 @@ describe('retry policy', () => {
       .intercept({ path: /\/orders\/regular\/.*/, method: 'DELETE' })
       .reply(() => {
         attempts += 1;
-        return { statusCode: 503, data: { status: 'error', message: 'down', error_type: 'NetworkException' } };
+        return {
+          statusCode: 503,
+          data: {
+            status: 'error',
+            message: 'down',
+            error_type: 'NetworkException',
+          },
+        };
       })
       .times(4);
 
-    await new KiteApi(makeClient())
-      .cancelOrder({ variety: 'regular', order_id: '123' })
-      .catch(() => undefined);
+    await new KiteApi(makeClient()).cancelOrder({ variety: 'regular', order_id: '123' }).catch(() => undefined);
 
     expect(attempts).toBe(1);
   });
@@ -408,7 +434,12 @@ describe('GTT serialisation', () => {
 
     await new KiteApi(makeClient()).placeGtt({
       type: 'single',
-      condition: { exchange: 'NSE', tradingsymbol: 'INFY', trigger_values: [1400], last_price: 1500 },
+      condition: {
+        exchange: 'NSE',
+        tradingsymbol: 'INFY',
+        trigger_values: [1400],
+        last_price: 1500,
+      },
       orders: [
         {
           exchange: 'NSE',
@@ -425,7 +456,9 @@ describe('GTT serialisation', () => {
     const params = new URLSearchParams(body);
     expect(params.get('type')).toBe('single');
     // Not a JSON body, and not flattened form fields — JSON strings in fields.
-    expect(JSON.parse(params.get('condition')!)).toMatchObject({ tradingsymbol: 'INFY' });
+    expect(JSON.parse(params.get('condition')!)).toMatchObject({
+      tradingsymbol: 'INFY',
+    });
     expect(JSON.parse(params.get('orders')!)).toHaveLength(1);
   });
 });

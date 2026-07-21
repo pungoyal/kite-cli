@@ -1,8 +1,8 @@
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { KiteCliError, ExitCode, UsageError } from './errors.js';
-import { registerSecret } from './redact.js';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { Endpoints } from './config.js';
+import { ExitCode, KiteCliError, UsageError } from './errors.js';
+import { registerSecret } from './redact.js';
 
 /**
  * The Kite Connect login handshake.
@@ -27,11 +27,7 @@ export function computeChecksum(apiKey: string, requestToken: string, apiSecret:
  * Postback checksum — note this is a DIFFERENT concatenation from the login
  * checksum: SHA256(order_id + order_timestamp + api_secret).
  */
-export function computePostbackChecksum(
-  orderId: string,
-  orderTimestamp: string,
-  apiSecret: string,
-): string {
+export function computePostbackChecksum(orderId: string, orderTimestamp: string, apiSecret: string): string {
   return createHash('sha256').update(`${orderId}${orderTimestamp}${apiSecret}`).digest('hex');
 }
 
@@ -146,7 +142,12 @@ export function waitForCallback(opts: CallbackServerOptions): {
       const stateOk = receivedState !== null && safeCompare(receivedState, opts.state);
 
       if (!stateOk) {
-        respondHtml(res, 400, 'Login failed', 'State mismatch — this callback did not come from the login this CLI started.');
+        respondHtml(
+          res,
+          400,
+          'Login failed',
+          'State mismatch — this callback did not come from the login this CLI started.',
+        );
         settle(() =>
           reject(
             new KiteCliError(
@@ -161,9 +162,7 @@ export function waitForCallback(opts: CallbackServerOptions): {
 
       if (status !== 'success' || !requestToken) {
         respondHtml(res, 400, 'Login failed', 'Kite did not return a request token.');
-        settle(() =>
-          reject(new KiteCliError('Kite did not return a request token.', ExitCode.Auth)),
-        );
+        settle(() => reject(new KiteCliError('Kite did not return a request token.', ExitCode.Auth)));
         return;
       }
 
@@ -236,11 +235,16 @@ function respondHtml(res: ServerResponse, status: number, title: string, detail:
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => {
     switch (char) {
-      case '&': return '&amp;';
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '"': return '&quot;';
-      default: return '&#39;';
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      default:
+        return '&#39;';
     }
   });
 }
@@ -279,7 +283,11 @@ export async function openBrowser(url: string): Promise<boolean> {
 
   return new Promise((resolve) => {
     try {
-      const child = spawn(command, args, { stdio: 'ignore', detached: true, shell: false });
+      const child = spawn(command, args, {
+        stdio: 'ignore',
+        detached: true,
+        shell: false,
+      });
       child.on('error', () => resolve(false));
       child.unref();
       // spawn errors surface asynchronously; give it a moment before claiming success.

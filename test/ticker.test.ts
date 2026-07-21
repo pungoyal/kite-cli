@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parsePacket, parseBinaryMessage, divisorFor, isTradable } from '../src/core/ticker.js';
+import { describe, expect, it } from 'vitest';
+import { divisorFor, isTradable, parseBinaryMessage, parsePacket } from '../src/core/ticker.js';
 
 /**
  * Binary tick parsing.
@@ -75,7 +75,12 @@ describe('index packets', () => {
     expect(tick.tradable).toBe(false);
     expect(tick.mode).toBe('quote');
     expect(tick.lastPrice).toBe(22_000);
-    expect(tick.ohlc).toEqual({ open: 21_950, high: 22_100, low: 21_900, close: 21_800 });
+    expect(tick.ohlc).toEqual({
+      open: 21_950,
+      high: 22_100,
+      low: 21_900,
+      close: 21_800,
+    });
   });
 
   it('computes percentage change against the previous close', () => {
@@ -123,7 +128,12 @@ describe('tradeable packets', () => {
     expect(tick.volume).toBe(1_000_000);
     expect(tick.buyQuantity).toBe(500);
     expect(tick.sellQuantity).toBe(700);
-    expect(tick.ohlc).toEqual({ open: 1480, high: 1520, low: 1470, close: 1475 });
+    expect(tick.ohlc).toEqual({
+      open: 1480,
+      high: 1520,
+      low: 1470,
+      close: 1475,
+    });
     expect(tick.depth).toBeUndefined();
   });
 
@@ -158,8 +168,16 @@ describe('tradeable packets', () => {
 
     expect(tick.depth?.buy).toHaveLength(5);
     expect(tick.depth?.sell).toHaveLength(5);
-    expect(tick.depth?.buy[0]).toEqual({ quantity: 100, price: 1499, orders: 3 });
-    expect(tick.depth?.sell[0]).toEqual({ quantity: 200, price: 1501, orders: 4 });
+    expect(tick.depth?.buy[0]).toEqual({
+      quantity: 100,
+      price: 1499,
+      orders: 3,
+    });
+    expect(tick.depth?.sell[0]).toEqual({
+      quantity: 200,
+      price: 1501,
+      orders: 4,
+    });
   });
 
   it('leaves timestamps undefined when the exchange sends zero', () => {

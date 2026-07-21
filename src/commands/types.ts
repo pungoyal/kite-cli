@@ -17,9 +17,7 @@ export type Handler<Options = Record<string, unknown>> = (
 ) => Promise<void> | void;
 
 /** Wraps a handler so it is given a context and has its errors reported. */
-export type Runner = <Options>(
-  handler: Handler<Options>,
-) => (...args: unknown[]) => Promise<void>;
+export type Runner = <Options>(handler: Handler<Options>) => (...args: unknown[]) => Promise<void>;
 
 /** Registers a group of related commands on the root program. */
 export type CommandFactory = (program: Command, run: Runner) => void;

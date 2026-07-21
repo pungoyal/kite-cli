@@ -1,11 +1,11 @@
-import { printTable, renderTable, renderKeyValue, heading, type Column } from '../output/table.js';
-import { money, rupees, quantity, dateOnly } from '../output/format.js';
-import { confirmAction, assertTradingEnabled } from '../safety.js';
-import { parseInstrumentKey, formatInstrumentKey } from '../core/instruments.js';
-import { UsageError, KiteCliError, ExitCode } from '../core/errors.js';
-import { PRODUCTS, type Product, type TransactionType, type GttParams } from '../core/api.js';
-import type { Gtt } from '../core/schemas.js';
 import type { Context } from '../context.js';
+import { type GttParams, PRODUCTS, type Product, type TransactionType } from '../core/api.js';
+import { ExitCode, KiteCliError, UsageError } from '../core/errors.js';
+import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js';
+import type { Gtt } from '../core/schemas.js';
+import { dateOnly, money, quantity, rupees } from '../output/format.js';
+import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
+import { assertTradingEnabled, confirmAction } from '../safety.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -27,11 +27,7 @@ export const gttCommands: CommandFactory = (program, run) => {
     .option('--active', 'Show only active triggers')
     .action(run(listGtt));
 
-  gtt
-    .command('get')
-    .description('Show one GTT trigger in detail')
-    .argument('<id>')
-    .action(run(getGtt));
+  gtt.command('get').description('Show one GTT trigger in detail').argument('<id>').action(run(getGtt));
 
   gtt
     .command('place')
@@ -44,11 +40,7 @@ export const gttCommands: CommandFactory = (program, run) => {
     .option('--product <product>', `Product (${PRODUCTS.join(', ')})`, 'CNC')
     .action(run(placeGtt));
 
-  gtt
-    .command('delete')
-    .description('Delete a GTT trigger')
-    .argument('<id>')
-    .action(run(deleteGtt));
+  gtt.command('delete').description('Delete a GTT trigger').argument('<id>').action(run(deleteGtt));
 };
 
 function collect(value: string, previous: string[]): string[] {
@@ -62,7 +54,10 @@ async function listGtt(ctx: Context, opts: { active?: boolean }): Promise<void> 
 
   const columns: Array<Column<Gtt>> = [
     { header: 'ID', value: (g, io) => io.dim(String(g.id)) },
-    { header: 'Symbol', value: (g, io) => io.bold(`${g.condition.exchange}:${g.condition.tradingsymbol}`) },
+    {
+      header: 'Symbol',
+      value: (g, io) => io.bold(`${g.condition.exchange}:${g.condition.tradingsymbol}`),
+    },
     { header: 'Type', value: (g) => (g.type === 'two-leg' ? 'OCO' : 'single') },
     {
       header: 'Side',
@@ -71,9 +66,21 @@ async function listGtt(ctx: Context, opts: { active?: boolean }): Promise<void> 
         return side === 'BUY' ? io.green('BUY') : side === 'SELL' ? io.red('SELL') : '—';
       },
     },
-    { header: 'Qty', value: (g) => quantity(g.orders[0]?.quantity), align: 'right' },
-    { header: 'Trigger', value: (g) => g.condition.trigger_values.map((v) => money(v)).join(' / '), align: 'right' },
-    { header: 'LTP', value: (g) => money(g.condition.last_price), align: 'right' },
+    {
+      header: 'Qty',
+      value: (g) => quantity(g.orders[0]?.quantity),
+      align: 'right',
+    },
+    {
+      header: 'Trigger',
+      value: (g) => g.condition.trigger_values.map((v) => money(v)).join(' / '),
+      align: 'right',
+    },
+    {
+      header: 'LTP',
+      value: (g) => money(g.condition.last_price),
+      align: 'right',
+    },
     { header: 'Status', value: (g, io) => colourGttStatus(io, g.status) },
     { header: 'Expires', value: (g) => dateOnly(g.expires_at) },
   ];
@@ -128,7 +135,10 @@ async function getGtt(ctx: Context, _opts: unknown, command: { args: string[] })
   io.line(heading(io, 'Orders'));
   io.line(
     renderTableFor(ctx, trigger.orders, [
-      { header: 'Side', value: (o, io) => (o.transaction_type === 'BUY' ? io.green('BUY') : io.red('SELL')) },
+      {
+        header: 'Side',
+        value: (o, io) => (o.transaction_type === 'BUY' ? io.green('BUY') : io.red('SELL')),
+      },
       { header: 'Qty', value: (o) => quantity(o.quantity), align: 'right' },
       { header: 'Price', value: (o) => money(o.price), align: 'right' },
       { header: 'Product', value: (o) => o.product ?? '—' },
@@ -139,7 +149,13 @@ async function getGtt(ctx: Context, _opts: unknown, command: { args: string[] })
 
 async function placeGtt(
   ctx: Context,
-  opts: { side: string; quantity: string; trigger: string[]; price: string[]; product?: string },
+  opts: {
+    side: string;
+    quantity: string;
+    trigger: string[];
+    price: string[];
+    product?: string;
+  },
   command: { args: string[] },
 ): Promise<void> {
   ctx.requireSession();
@@ -219,7 +235,10 @@ async function placeGtt(
     details: [
       { label: 'Instrument', value: instrumentKey },
       { label: 'Type', value: type === 'two-leg' ? 'two-leg (OCO)' : 'single' },
-      { label: 'Side', value: side === 'BUY' ? ctx.io.green(side) : ctx.io.red(side) },
+      {
+        label: 'Side',
+        value: side === 'BUY' ? ctx.io.green(side) : ctx.io.red(side),
+      },
       { label: 'Quantity', value: quantity(qty) },
       { label: 'Last price', value: rupees(lastPrice) },
       ...triggers.map((trigger, index) => ({
@@ -251,7 +270,7 @@ async function deleteGtt(ctx: Context, _opts: unknown, command: { args: string[]
   // Enrichment for the preview. Deleting a GTT only removes a pending trigger,
   // so a failed lookup does not need to block — but the user must be told the
   // preview below is unverified rather than silently shown "unknown".
-  let existing;
+  let existing: Gtt | undefined;
   try {
     existing = await ctx.api.getGtt(id, ctx.signal);
   } catch {
@@ -304,5 +323,7 @@ function normaliseProduct(value: string): Product {
 }
 
 function renderTableFor<T>(ctx: Context, rows: readonly T[], columns: Array<Column<T>>): string {
-  return renderTable(ctx.io, rows, columns, { compact: ctx.config.output.compact });
+  return renderTable(ctx.io, rows, columns, {
+    compact: ctx.config.output.compact,
+  });
 }

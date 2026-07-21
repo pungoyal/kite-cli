@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MockAgent } from 'undici';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { PassThrough } from 'node:stream';
+import { MockAgent } from 'undici';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setDispatcher } from '../src/core/client.js';
-import { generateOrderTag } from '../src/safety.js';
 import { ExitCode } from '../src/core/errors.js';
-import { run } from '../src/run.js';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { configDir, configFile, sessionFile } from '../src/core/paths.js';
+import { run } from '../src/run.js';
+import { generateOrderTag } from '../src/safety.js';
 
 /**
  * End-to-end safety behaviour, driven through run() in-process.
@@ -24,11 +24,7 @@ let err: string;
 
 async function seedSession(config: Record<string, unknown> = {}) {
   await mkdir(configDir(), { recursive: true });
-  await writeFile(
-    configFile(),
-    JSON.stringify({ apiKey: 'testkey', env: 'production', ...config }),
-    'utf8',
-  );
+  await writeFile(configFile(), JSON.stringify({ apiKey: 'testkey', env: 'production', ...config }), 'utf8');
   await writeFile(
     sessionFile(),
     JSON.stringify({
@@ -95,9 +91,24 @@ describe('confirmation in a non-interactive shell', () => {
     agent
       .get('https://api.kite.trade')
       .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
+      .reply(200, {
+        status: 'success',
+        data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+      });
 
-    const code = await invoke(['orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1', '--type', 'LIMIT', '--price', '1500']);
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+    ]);
 
     expect(code).toBe(ExitCode.ConfirmationRequired);
     // The error must name the flag that unblocks it.
@@ -111,14 +122,27 @@ describe('--dry-run', () => {
     agent
       .get('https://api.kite.trade')
       .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
+      .reply(200, {
+        status: 'success',
+        data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+      });
 
     // No interceptor is registered for POST /orders/regular. With
     // disableNetConnect, any attempt to place would throw — so reaching exit 0
     // proves nothing was sent.
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '10',
-      '--type', 'LIMIT', '--price', '1500', '--dry-run',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--dry-run',
     ]);
 
     expect(code).toBe(ExitCode.Ok);
@@ -151,11 +175,24 @@ describe('order value cap', () => {
     agent
       .get('https://api.kite.trade')
       .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
+      .reply(200, {
+        status: 'success',
+        data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+      });
 
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '10',
-      '--type', 'LIMIT', '--price', '1500', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--yes',
     ]);
 
     expect(code).toBe(ExitCode.TradingDisabled);
@@ -165,16 +202,27 @@ describe('order value cap', () => {
   it('allows an order below the maximum', async () => {
     await seedSession({ trading: { enabled: true, maxOrderValue: 100_000 } });
     const pool = agent.get('https://api.kite.trade');
-    pool
-      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
     pool
       .intercept({ path: '/orders/regular', method: 'POST' })
       .reply(200, { status: 'success', data: { order_id: '999' } });
 
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '10',
-      '--type', 'LIMIT', '--price', '1500', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--yes',
     ]);
 
     expect(code).toBe(ExitCode.Ok);
@@ -195,7 +243,11 @@ describe('the value cap fails closed', () => {
     agent
       .get('https://api.kite.trade')
       .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(429, { status: 'error', message: 'Too many requests', error_type: 'NetworkException' });
+      .reply(429, {
+        status: 'error',
+        message: 'Too many requests',
+        error_type: 'NetworkException',
+      });
 
     const code = await invoke(['orders', 'place', 'NSE:RELIANCE', '-s', 'BUY', '-q', '5000', '--yes']);
 
@@ -206,9 +258,11 @@ describe('the value cap fails closed', () => {
   it('still allows an unpriced order when no cap is configured', async () => {
     await seedSession({ trading: { enabled: true } });
     const pool = agent.get('https://api.kite.trade');
-    pool
-      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(429, { status: 'error', message: 'Too many requests', error_type: 'NetworkException' });
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(429, {
+      status: 'error',
+      message: 'Too many requests',
+      error_type: 'NetworkException',
+    });
     pool
       .intercept({ path: '/orders/regular', method: 'POST' })
       .reply(200, { status: 'success', data: { order_id: '555' } });
@@ -259,10 +313,7 @@ describe('the value cap applies only to exposure-increasing actions', () => {
       .intercept({ path: '/portfolio/positions', method: 'PUT' })
       .reply(200, { status: 'success', data: true });
 
-    const code = await invoke([
-      'convert', 'NSE:INFY', '--quantity', '10',
-      '--from', 'MIS', '--to', 'CNC', '--yes',
-    ]);
+    const code = await invoke(['convert', 'NSE:INFY', '--quantity', '10', '--from', 'MIS', '--to', 'CNC', '--yes']);
     expect(code).toBe(ExitCode.Ok);
   });
 });
@@ -293,9 +344,11 @@ describe('the value cap tracks the direction of a modify', () => {
     });
     // Unpriced order + failed quote lookup: value is unknown. Under the old
     // "every modify increases exposure" rule this fail-closed on the cap.
-    pool
-      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(429, { status: 'error', message: 'Too many requests', error_type: 'NetworkException' });
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(429, {
+      status: 'error',
+      message: 'Too many requests',
+      error_type: 'NetworkException',
+    });
     pool
       .intercept({ path: /\/orders\/regular\/.*/, method: 'PUT' })
       .reply(200, { status: 'success', data: { order_id: '123' } });
@@ -336,10 +389,11 @@ describe('cancel fails closed on an unreadable orderbook', () => {
    */
   it('refuses rather than guessing the variety', async () => {
     await seedSession();
-    agent
-      .get('https://api.kite.trade')
-      .intercept({ path: '/orders', method: 'GET' })
-      .reply(503, { status: 'error', message: 'OMS down', error_type: 'NetworkException' });
+    agent.get('https://api.kite.trade').intercept({ path: '/orders', method: 'GET' }).reply(503, {
+      status: 'error',
+      message: 'OMS down',
+      error_type: 'NetworkException',
+    });
 
     const code = await invoke(['orders', 'cancel', '250720000123456', '--yes']);
 
@@ -350,9 +404,11 @@ describe('cancel fails closed on an unreadable orderbook', () => {
   it('proceeds when the variety is given explicitly', async () => {
     await seedSession();
     const pool = agent.get('https://api.kite.trade');
-    pool
-      .intercept({ path: '/orders', method: 'GET' })
-      .reply(503, { status: 'error', message: 'OMS down', error_type: 'NetworkException' });
+    pool.intercept({ path: '/orders', method: 'GET' }).reply(503, {
+      status: 'error',
+      message: 'OMS down',
+      error_type: 'NetworkException',
+    });
     pool
       .intercept({ path: /\/orders\/co\/.*/, method: 'DELETE' })
       .reply(200, { status: 'success', data: { order_id: '250720000123456' } });
@@ -385,8 +441,18 @@ describe('input validation', () => {
   it('rejects a MARKET order that also specifies a price', async () => {
     await seedSession();
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1',
-      '--type', 'MARKET', '--price', '100', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'MARKET',
+      '--price',
+      '100',
+      '--yes',
     ]);
     expect(code).toBe(ExitCode.Usage);
   });
@@ -394,8 +460,18 @@ describe('input validation', () => {
   it('rejects an SL order with no trigger price', async () => {
     await seedSession();
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1',
-      '--type', 'SL', '--price', '100', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'SL',
+      '--price',
+      '100',
+      '--yes',
     ]);
     expect(code).toBe(ExitCode.Usage);
     expect(err).toMatch(/--trigger-price is required/i);
@@ -404,8 +480,20 @@ describe('input validation', () => {
   it('rejects a non-alphanumeric tag', async () => {
     await seedSession();
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1',
-      '--type', 'LIMIT', '--price', '100', '--tag', 'has-a-dash', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'LIMIT',
+      '--price',
+      '100',
+      '--tag',
+      'has-a-dash',
+      '--yes',
     ]);
     expect(code).toBe(ExitCode.Usage);
   });
@@ -426,15 +514,14 @@ describe('reconciliation after a failed placement', () => {
   it('checks the orderbook by tag instead of retrying, and reports the order landed', async () => {
     await seedSession();
     const pool = agent.get('https://api.kite.trade');
-    pool
-      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
 
     // The placement fails at the network level — ambiguous: it may have executed.
     let sentTag = '';
-    pool
-      .intercept({ path: '/orders/regular', method: 'POST' })
-      .replyWithError(new Error('socket hang up'));
+    pool.intercept({ path: '/orders/regular', method: 'POST' }).replyWithError(new Error('socket hang up'));
 
     // Capture the tag from the preview instead of the body, since a network
     // error gives us no request callback. The tag is always previewed.
@@ -442,13 +529,26 @@ describe('reconciliation after a failed placement', () => {
       sentTag = /Tag\s+(\S+)/.exec(err)?.[1] ?? '';
       return {
         statusCode: 200,
-        data: { status: 'success', data: [{ order_id: '777', status: 'COMPLETE', tag: sentTag }] },
+        data: {
+          status: 'success',
+          data: [{ order_id: '777', status: 'COMPLETE', tag: sentTag }],
+        },
       };
     });
 
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1',
-      '--type', 'LIMIT', '--price', '1500', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--yes',
     ]);
 
     expect(code).toBe(ExitCode.Upstream);
@@ -461,17 +561,26 @@ describe('reconciliation after a failed placement', () => {
   it('reports that no order was found (without promising it is safe to retry) when the tag is absent', async () => {
     await seedSession();
     const pool = agent.get('https://api.kite.trade');
-    pool
-      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
-    pool
-      .intercept({ path: '/orders/regular', method: 'POST' })
-      .replyWithError(new Error('socket hang up'));
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    pool.intercept({ path: '/orders/regular', method: 'POST' }).replyWithError(new Error('socket hang up'));
     pool.intercept({ path: '/orders', method: 'GET' }).reply(200, { status: 'success', data: [] });
 
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1',
-      '--type', 'LIMIT', '--price', '1500', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--yes',
     ]);
 
     expect(code).toBe(ExitCode.Upstream);
@@ -490,27 +599,45 @@ describe('reconciliation after a failed placement', () => {
   it('reconciles on an HTTP 5xx rather than telling the user to retry', async () => {
     await seedSession();
     const pool = agent.get('https://api.kite.trade');
-    pool
-      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
 
     let sentTag = '';
     pool.intercept({ path: '/orders/regular', method: 'POST' }).reply((opts) => {
       sentTag = tagFrom(String(opts.body));
       return {
         statusCode: 502,
-        data: { status: 'error', message: 'Bad gateway', error_type: 'NetworkException' },
+        data: {
+          status: 'error',
+          message: 'Bad gateway',
+          error_type: 'NetworkException',
+        },
       };
     });
 
     pool.intercept({ path: '/orders', method: 'GET' }).reply(() => ({
       statusCode: 200,
-      data: { status: 'success', data: [{ order_id: '888', status: 'COMPLETE', tag: sentTag }] },
+      data: {
+        status: 'success',
+        data: [{ order_id: '888', status: 'COMPLETE', tag: sentTag }],
+      },
     }));
 
     const code = await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1',
-      '--type', 'LIMIT', '--price', '1500', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--yes',
     ]);
 
     expect(code).toBe(ExitCode.Upstream);
@@ -522,19 +649,35 @@ describe('reconciliation after a failed placement', () => {
   it('makes a user-supplied --tag unique, so it cannot match a stale order', async () => {
     await seedSession();
     const pool = agent.get('https://api.kite.trade');
-    pool
-      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-      .reply(200, { status: 'success', data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } } });
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
 
     let sentTag = '';
     pool.intercept({ path: '/orders/regular', method: 'POST' }).reply((opts) => {
       sentTag = tagFrom(String(opts.body));
-      return { statusCode: 200, data: { status: 'success', data: { order_id: '999' } } };
+      return {
+        statusCode: 200,
+        data: { status: 'success', data: { order_id: '999' } },
+      };
     });
 
     await invoke([
-      'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1',
-      '--type', 'LIMIT', '--price', '1500', '--tag', 'daily', '--yes',
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--tag',
+      'daily',
+      '--yes',
     ]);
 
     // Keeps the user's label as a prefix for their own filtering...

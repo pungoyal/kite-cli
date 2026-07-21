@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
-import { redactUrl } from './redact.js';
 import type { Endpoints } from './config.js';
+import { redactUrl } from './redact.js';
 
 /**
  * Kite streaming quotes over WebSocket.
@@ -265,7 +265,9 @@ export const MAX_CONNECTIONS_PER_KEY = 3;
 
 export class Ticker extends EventEmitter<TickerEvents> {
   private ws: WebSocket | undefined;
-  private readonly opts: Required<Omit<TickerOptions, 'userId'>> & { userId?: string | undefined };
+  private readonly opts: Required<Omit<TickerOptions, 'userId'>> & {
+    userId?: string | undefined;
+  };
 
   /** Desired subscription state, replayed on every reconnect. */
   private readonly subscriptions = new Set<number>();
@@ -338,7 +340,7 @@ export class Ticker extends EventEmitter<TickerEvents> {
     socket.on('error', (err: Error) => {
       // The ws error message can embed the full URL, which carries the access
       // token as a query parameter. Never emit it unredacted.
-      this.emit('error', new Error(redactUrl(this.opts.endpoints.ws) + ': ' + redactMessage(err.message, target)));
+      this.emit('error', new Error(`${redactUrl(this.opts.endpoints.ws)}: ${redactMessage(err.message, target)}`));
     });
 
     socket.on('close', (code: number, reason: Buffer) => {

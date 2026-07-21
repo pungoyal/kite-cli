@@ -1,8 +1,8 @@
-import { confirm, text, isCancel } from '@clack/prompts';
 import { randomBytes } from 'node:crypto';
-import { KiteCliError, ExitCode, AbortedError } from './core/errors.js';
-import { rupees } from './output/format.js';
+import { confirm, isCancel, text } from '@clack/prompts';
 import type { Context } from './context.js';
+import { AbortedError, ExitCode, KiteCliError } from './core/errors.js';
+import { rupees } from './output/format.js';
 
 /**
  * Guard rails for money-moving commands.
@@ -117,9 +117,7 @@ export async function confirmAction(ctx: Context, opts: ConfirmOptions): Promise
   // Whether we will actually stop and ask. Computed up front because it
   // decides whether the preview may be suppressed.
   const willPrompt =
-    !ctx.options.dryRun &&
-    !ctx.options.yes &&
-    (ctx.config.trading.confirm || opts.mutatesOrders === true);
+    !ctx.options.dryRun && !ctx.options.yes && (ctx.config.trading.confirm || opts.mutatesOrders === true);
 
   // Always show what is about to happen, even with --yes, so the record exists
   // in the terminal scrollback.

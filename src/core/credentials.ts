@@ -1,6 +1,6 @@
+import { ExitCode, KiteCliError } from './errors.js';
 import { registerSecret } from './redact.js';
-import { encryptToFile, decryptFromFile, deleteCredentialFile } from './secretstore.js';
-import { KiteCliError, ExitCode } from './errors.js';
+import { decryptFromFile, deleteCredentialFile, encryptToFile } from './secretstore.js';
 
 /**
  * Layered credential storage.
@@ -133,10 +133,7 @@ export interface CredentialStoreOptions {
  * any subsequent log, error, or stack trace even if it reaches an unexpected
  * code path.
  */
-export async function getSecret(
-  name: SecretName,
-  opts: CredentialStoreOptions,
-): Promise<CredentialLookup | null> {
+export async function getSecret(name: SecretName, opts: CredentialStoreOptions): Promise<CredentialLookup | null> {
   const fromEnv = process.env[ENV_VAR[name]];
   if (fromEnv && fromEnv.trim() !== '') {
     registerSecret(fromEnv);
@@ -164,11 +161,7 @@ export async function getSecret(
   return null;
 }
 
-export async function setSecret(
-  name: SecretName,
-  value: string,
-  opts: CredentialStoreOptions,
-): Promise<Backend> {
+export async function setSecret(name: SecretName, value: string, opts: CredentialStoreOptions): Promise<Backend> {
   registerSecret(value);
   const account = accountKey(name, opts.env);
 

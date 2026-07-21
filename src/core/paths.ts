@@ -1,6 +1,6 @@
+import { chmod, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { mkdir, chmod } from 'node:fs/promises';
 
 /**
  * XDG-compliant paths, with the usual macOS pragmatism: we use ~/.config rather
