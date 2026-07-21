@@ -27,9 +27,15 @@ beforeAll(async () => {
   try {
     await access(cli);
   } catch {
-    throw new Error('dist/cli.js is missing. Run `npm run build` before the smoke tests.');
+    // Build on demand. These tests run under `npm test` alongside the unit
+    // suite, and CI runs the test step before the dedicated build step, so a
+    // fresh checkout has no dist/ yet. Self-building keeps `npm test` working
+    // from anywhere without depending on step order. tsc is invoked directly
+    // (not via `npm run build`) so this stays portable and shell-free.
+    const tsc = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
+    await execa(process.execPath, [tsc, '-p', 'tsconfig.build.json'], { cwd: root });
   }
-});
+}, 120_000);
 
 // These tests mutate a real config file on disk. Without a wipe they depend on
 // both the order they run in AND on state left by previous runs — e.g. the

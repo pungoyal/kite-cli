@@ -1,4 +1,4 @@
-import { Agent, interceptors, type Dispatcher } from 'undici';
+import { Agent, fetch, interceptors, type Dispatcher } from 'undici';
 import { z } from 'zod';
 import {
   KiteApiError,
@@ -56,6 +56,9 @@ export interface ClientOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** The concrete Response type returned by undici's `fetch`. */
+type FetchResponse = Awaited<ReturnType<typeof fetch>>;
 
 /**
  * A shared dispatcher with sane timeouts.
@@ -154,17 +157,17 @@ export class KiteClient {
     return url;
   }
 
-  private headers(extra?: Record<string, string>): Headers {
-    const headers = new Headers({
+  private headers(extra?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = {
       'X-Kite-Version': '3',
       Accept: 'application/json',
       'User-Agent': 'kite-cli',
       ...extra,
-    });
+    };
     if (this.accessToken) {
       // NEVER log this header. It is `token <api_key>:<access_token>` and is
       // attached to every request, making it the single likeliest leak path.
-      headers.set('Authorization', `token ${this.apiKey}:${this.accessToken}`);
+      headers['Authorization'] = `token ${this.apiKey}:${this.accessToken}`;
     }
     return headers;
   }
@@ -206,19 +209,21 @@ export class KiteClient {
       );
     }
 
-    let response: Response;
+    let response: FetchResponse;
     try {
+      // Use undici's own `fetch`, not the global one. The global fetch only
+      // began honouring the per-request `dispatcher` option in recent Node
+      // releases; on older supported versions it silently ignores it and uses
+      // the default agent — which would drop our timeouts and retry policy at
+      // runtime, and bypass MockAgent in tests. undici's fetch always honours
+      // it, so behaviour is identical on every supported Node version.
       response = await fetch(url, {
         method: opts.method,
         headers: this.headers(extraHeaders),
         body,
         signal,
-        // `dispatcher` is a valid Node fetch option but is absent from the DOM
-        // RequestInit type, and undici's own Dispatcher type does not overlap
-        // with the one bundled in @types/node. The double assertion is the
-        // documented workaround.
         dispatcher: dispatcher(),
-      } as unknown as RequestInit);
+      });
     } catch (err) {
       throw this.toNetworkError(err, opts.method, url);
     }
@@ -252,7 +257,7 @@ export class KiteClient {
   }
 
   private handleResponse<S extends z.ZodType>(
-    response: Response,
+    response: FetchResponse,
     text: string,
     schema: S,
     url: URL,
@@ -339,18 +344,15 @@ export class KiteClient {
     const timeout = AbortSignal.timeout(opts.timeoutMs ?? 120_000);
     const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 
-    let response: Response;
+    let response: FetchResponse;
     try {
       response = await fetch(url, {
         method: 'GET',
         headers: this.headers(),
         signal,
-        // `dispatcher` is a valid Node fetch option but is absent from the DOM
-        // RequestInit type, and undici's own Dispatcher type does not overlap
-        // with the one bundled in @types/node. The double assertion is the
-        // documented workaround.
+        // undici's fetch (see request()) so the dispatcher is always honoured.
         dispatcher: dispatcher(),
-      } as unknown as RequestInit);
+      });
     } catch (err) {
       throw this.toNetworkError(err, 'GET', url);
     }
