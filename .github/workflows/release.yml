@@ -31,6 +31,11 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
+      # Guarantee the npm CLI is new enough for OIDC trusted publishing,
+      # regardless of which npm the pinned Node happens to bundle.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@latest
+
       - run: npm ci --ignore-scripts
 
       - name: Typecheck
