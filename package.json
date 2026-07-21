@@ -1,6 +1,6 @@
 {
   "name": "@pungoyal/kite-cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Unofficial command-line interface for the Zerodha Kite Connect API — not affiliated with or endorsed by Zerodha",
   "keywords": [
     "zerodha",
