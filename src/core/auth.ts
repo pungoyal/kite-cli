@@ -254,6 +254,50 @@ export function redirectUrlFor(port: number, path: string): string {
 }
 
 /**
+ * Copy text to the OS clipboard, returning whether it succeeded.
+ *
+ * Like {@link openBrowser}, the text is piped to a fixed binary's stdin — never
+ * through a shell and never as an argv element — so a URL's `&`/`=` cannot
+ * become word-splitting or command injection. On Linux there is no single
+ * clipboard tool, so we try the common ones in turn (Wayland first, then X11).
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  const candidates: Array<[string, string[]]> =
+    process.platform === 'darwin'
+      ? [['pbcopy', []]]
+      : process.platform === 'win32'
+        ? [['clip', []]]
+        : [
+            ['wl-copy', []],
+            ['xclip', ['-selection', 'clipboard']],
+            ['xsel', ['--clipboard', '--input']],
+          ];
+
+  for (const [command, args] of candidates) {
+    if (await pipeToCommand(command, args, text)) return true;
+  }
+  return false;
+}
+
+/** Spawn `command`, write `text` to its stdin, resolve true on a clean exit. */
+function pipeToCommand(command: string, args: string[], text: string): Promise<boolean> {
+  return import('node:child_process').then(
+    ({ spawn }) =>
+      new Promise<boolean>((resolve) => {
+        try {
+          const child = spawn(command, args, { stdio: ['pipe', 'ignore', 'ignore'], shell: false });
+          child.on('error', () => resolve(false));
+          child.on('close', (code) => resolve(code === 0));
+          child.stdin.on('error', () => resolve(false));
+          child.stdin.end(text);
+        } catch {
+          resolve(false);
+        }
+      }),
+  );
+}
+
+/**
  * Open a URL in the user's default browser.
  *
  * The URL is passed as an argv element to a fixed binary, never through a

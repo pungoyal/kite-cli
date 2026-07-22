@@ -8,6 +8,13 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- `kite login` now always prints the login URL to the console (not only when it
+  can't open a browser), and while waiting for the callback you can press `c` to
+  copy the URL to the clipboard. Pressing Ctrl-C during the wait now aborts on
+  the first keypress instead of hanging until a second.
+
 ## [0.3.0] - 2026-07-22
 
 ### Added

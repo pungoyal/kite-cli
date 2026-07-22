@@ -50,7 +50,7 @@ Then:
 kite login
 ```
 
-This opens your browser, you log in to Zerodha normally (including your TOTP), and the CLI captures the callback on loopback. Your API secret goes into your OS keyring; the daily access token is stored alongside it.
+This opens your browser, you log in to Zerodha normally (including your TOTP), and the CLI captures the callback on loopback. The login URL is also printed to the terminal — press `c` while it's waiting to copy it to your clipboard (handy if the browser didn't open, or you want to log in on another device). Your API secret goes into your OS keyring; the daily access token is stored alongside it.
 
 **Want to try it without a subscription or real money?** Zerodha runs a public sandbox:
 

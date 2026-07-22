@@ -3,6 +3,7 @@ import type { Context } from '../context.js';
 import {
   buildLoginUrl,
   computeChecksum,
+  copyToClipboard,
   generateState,
   openBrowser,
   redirectUrlFor,
@@ -187,21 +188,90 @@ async function callbackFlow(ctx: Context, loginUrl: string): Promise<string> {
   io.info('Set it at https://developers.kite.trade if login fails.');
   io.note('');
 
+  // Show the URL unconditionally: the browser may not have opened, may have
+  // landed in the wrong profile, or the user may want to log in on another
+  // device. The URL carries only the api_key and CSRF state — no token.
+  io.info('Login URL:');
+  io.note(`  ${loginUrl}`);
+  io.note('');
+
   const opened = await openBrowser(loginUrl);
   if (opened) {
     io.info('Opened your browser to complete login…');
   } else {
-    io.warn('Could not open a browser automatically. Open this URL manually:');
-    io.note(`  ${loginUrl}`);
+    io.warn('Could not open a browser automatically. Open the URL above manually.');
   }
-  io.info('Waiting for the callback (Ctrl-C to abort)…');
+
+  // Let the user grab the URL without selecting it in the terminal. Copy-on-`c`
+  // and Ctrl-C both funnel through `interrupted`, which loses the race against a
+  // successful callback. A single Ctrl-C aborts the wait — raw mode swallows the
+  // SIGINT, and the loopback promise never observes ctx.signal on its own.
+  let interrupt: () => void = () => {};
+  const interrupted = new Promise<never>((_, reject) => {
+    interrupt = () => reject(new AbortedError('Interrupted.'));
+  });
+  const onAbort = () => interrupt();
+  if (ctx.signal.aborted) onAbort();
+  else ctx.signal.addEventListener('abort', onAbort, { once: true });
+  const stopKeys = listenForKeys(ctx, loginUrl, interrupt);
+
+  io.info(`Waiting for the callback (press ${io.bold('c')} to copy the login URL, Ctrl-C to abort)…`);
 
   try {
-    const result = await server.promise;
+    const result = await Promise.race([server.promise, interrupted]);
     return result.requestToken;
   } finally {
+    // Always restore the terminal and detach listeners, even on abort — the
+    // loopback promise may never settle, so this cannot hang off it.
+    stopKeys();
+    ctx.signal.removeEventListener('abort', onAbort);
     server.close();
   }
+}
+
+/**
+ * While waiting for the browser callback, listen for a `c` keypress to copy the
+ * login URL, and for Ctrl-C to abort. Entering raw mode makes us responsible for
+ * both restoring the terminal and re-handling Ctrl-C (raw mode no longer raises
+ * SIGINT). Returns a no-op when stdin is not a TTY, and an idempotent cleanup
+ * that both the caller and the Ctrl-C path can safely call.
+ */
+function listenForKeys(ctx: Context, loginUrl: string, onInterrupt: () => void): () => void {
+  const { io } = ctx;
+  const stdin = process.stdin;
+  if (!stdin.isTTY) return () => {};
+
+  const wasRaw = stdin.isRaw;
+  let stopped = false;
+
+  const cleanup = () => {
+    if (stopped) return;
+    stopped = true;
+    stdin.off('data', onData);
+    stdin.setRawMode(wasRaw);
+    stdin.pause();
+  };
+
+  const onData = (chunk: Buffer) => {
+    // 0x03 is Ctrl-C, which raw mode delivers as a byte instead of a SIGINT.
+    if (chunk.length === 1 && chunk[0] === 0x03) {
+      cleanup();
+      onInterrupt();
+      return;
+    }
+    const key = chunk.toString('utf8');
+    if (key === 'c' || key === 'C') {
+      void copyToClipboard(loginUrl).then((ok) => {
+        if (ok) io.success('Login URL copied to clipboard.');
+        else io.warn('Could not copy to the clipboard (no clipboard tool found).');
+      });
+    }
+  };
+
+  stdin.setRawMode(true);
+  stdin.resume();
+  stdin.on('data', onData);
+  return cleanup;
 }
 
 /** Fallback for remote shells, where no browser can reach 127.0.0.1. */
