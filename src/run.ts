@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { Command, CommanderError } from 'commander';
+import { applyGlobalOptions, registerCommands } from './commands/register.js';
 import type { Handler } from './commands/types.js';
 import { createContext, type GlobalOptions } from './context.js';
 import { AbortedError, ExitCode, type ExitCodeValue, KiteCliError } from './core/errors.js';
@@ -48,16 +49,6 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
     .name('kite')
     .description('Unofficial command-line interface for the Zerodha Kite Connect API (not affiliated with Zerodha)')
     .version(VERSION, '-v, --version')
-    .option('--json', 'Emit JSON instead of formatted tables')
-    .option('--color <when>', 'Colour output: auto, always, or never')
-    // Deliberately no `-q` short form: it would shadow `-q, --quantity` on the
-    // order and GTT subcommands, which is typed far more often than --quiet.
-    .option('--quiet', 'Suppress informational messages')
-    .option('--debug', 'Print redacted request diagnostics to stderr')
-    .option('--env <env>', 'Environment: production or sandbox')
-    .option('--profile <name>', 'Account profile to use (see `kite profiles`)')
-    .option('-y, --yes', 'Skip confirmation prompts (use with care)')
-    .option('--dry-run', 'Show what would happen without sending anything to Kite')
     .showHelpAfterError('(run `kite --help` for usage)')
     .configureOutput({
       writeOut: (str) => (opts.streams?.stdout ?? process.stdout).write(str),
@@ -66,6 +57,8 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
     // Throw instead of calling process.exit, so `run()` stays testable and
     // always returns its exit code.
     .exitOverride();
+
+  applyGlobalOptions(program);
 
   /** Wraps a handler with context construction and error reporting. */
   const withContext =
@@ -84,47 +77,11 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
       }
     };
 
-  // Registered lazily so a bare `kite quote` never pays to import the
-  // dashboard renderer, the ticker, or the prompt library.
-  const { authCommands } = await import('./commands/auth.js');
-  const { profileCommands } = await import('./commands/profiles.js');
-  const { portfolioCommands } = await import('./commands/portfolio.js');
-  const { marketCommands } = await import('./commands/market.js');
-  const { orderCommands } = await import('./commands/orders.js');
-  const { gttCommands } = await import('./commands/gtt.js');
-  const { alertCommands } = await import('./commands/alerts.js');
-  const { marginCommands } = await import('./commands/margins.js');
-  const { mfCommands } = await import('./commands/mf.js');
-  const { watchCommands } = await import('./commands/watch.js');
-  const { configCommands } = await import('./commands/config.js');
-
-  // commandsGroup applies to every command registered after it, so the group
-  // is set immediately before each block. With ~25 commands this is the
-  // difference between a readable --help and a wall of text.
-  program.commandsGroup('Account:');
-  authCommands(program, withContext);
-  profileCommands(program, withContext);
-
-  program.commandsGroup('Portfolio:');
-  portfolioCommands(program, withContext);
-
-  program.commandsGroup('Mutual funds:');
-  mfCommands(program, withContext);
-
-  program.commandsGroup('Market data:');
-  marketCommands(program, withContext);
-
-  program.commandsGroup('Trading:');
-  orderCommands(program, withContext);
-  gttCommands(program, withContext);
-  alertCommands(program, withContext);
-  marginCommands(program, withContext);
-
-  program.commandsGroup('Streaming:');
-  watchCommands(program, withContext);
-
-  program.commandsGroup('Settings:');
-  configCommands(program, withContext);
+  // Registered through the shared registration path (see commands/register.ts)
+  // so run() and `kite completion` build the exact same command tree. Modules
+  // are still imported lazily inside registerCommands, so a bare `kite quote`
+  // never pays to parse the dashboard renderer or the ticker up front.
+  await registerCommands(program, withContext);
 
   program.addHelpText(
     'after',
