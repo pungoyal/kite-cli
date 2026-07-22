@@ -8,6 +8,14 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- `kite completion <bash|zsh|fish>` prints a shell completion script (the shell
+  is auto-detected from `$SHELL` when omitted). Completions are generated from
+  the live command tree, so new commands and flags are completable without a
+  hand-maintained list to keep in sync; regenerate after upgrading. The bash
+  script works on the bash 3.2 that ships with macOS.
+
 ### Changed
 
 - `kite login` now always prints the login URL to the console (not only when it

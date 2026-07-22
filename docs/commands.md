@@ -70,6 +70,7 @@ Streaming:
 
 Settings:
   config                            View and change CLI settings
+  completion [shell]                Print a shell completion script
 
 Commands:
   help [command]                    display help for command
@@ -903,6 +904,25 @@ Options:
 Usage: kite config path [options]
 
 Print the paths this CLI reads and writes
+
+Options:
+  -h, --help  display help for command
+```
+
+## `kite completion`
+
+```
+Usage: kite completion [options] [shell]
+
+Print a shell completion script for bash, zsh, or fish.
+
+The shell is auto-detected from $SHELL when omitted. Install with, e.g.:
+  bash   kite completion bash >> ~/.bash_completion
+  zsh    kite completion zsh  > ~/.zfunc/_kite   (with ~/.zfunc on your fpath)
+  fish   kite completion fish > ~/.config/fish/completions/kite.fish
+
+Arguments:
+  shell       Target shell: bash, zsh, or fish
 
 Options:
   -h, --help  display help for command
