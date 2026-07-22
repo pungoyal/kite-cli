@@ -8,6 +8,18 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- `kite mcp` runs a read-only [Model Context Protocol](https://modelcontextprotocol.io)
+  server over stdio, so an LLM agent (Claude and others) can inspect a Kite
+  account — profile, holdings, positions, funds, orders, trades, live
+  quotes/LTP/OHLC, and instrument search. It **cannot** place, modify or cancel
+  an order: a money-moving command must render the resolved order and be
+  confirmed at a terminal, which an MCP server has none of, so writes are
+  deliberately not exposed. The server is hand-rolled (no new dependencies, in
+  keeping with the dependency budget), requires a live session, and redacts
+  every tool result like the rest of the transport.
+
 ## [0.4.0] - 2026-07-22
 
 ### Added

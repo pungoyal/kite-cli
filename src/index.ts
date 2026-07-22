@@ -44,6 +44,11 @@ export {
   parseInstrumentsCsv,
 } from './core/instruments.js';
 export {
+  McpServer,
+  type McpServerOptions,
+  type McpTool,
+} from './core/mcp.js';
+export {
   DEFAULT_PROFILE,
   getProfile,
   listProfileNames,

@@ -295,6 +295,31 @@ kite whoami --json || kite login       # exit code 3 means "no session"
 
 `NO_COLOR` is honoured, and colour is disabled automatically when stdout is not a TTY.
 
+### Agents (MCP)
+
+`kite mcp` exposes Kite's **read-only** endpoints to an LLM agent over the
+[Model Context Protocol](https://modelcontextprotocol.io), so Claude — or any MCP
+client — can answer "how's my portfolio doing?" against live data. It can read
+your profile, holdings, positions, funds, orders, trades, quotes and instruments;
+it **cannot** place, modify or cancel anything. Trading stays at a
+human-confirmed terminal, by design.
+
+Point an MCP client at it — try the sandbox first:
+
+```json
+{
+  "mcpServers": {
+    "kite": {
+      "command": "kite",
+      "args": ["mcp", "--env", "sandbox"]
+    }
+  }
+}
+```
+
+Drop the `--env sandbox` args to run against your real account (still read-only).
+The server needs a live session, so `kite login` first.
+
 ## Multiple accounts
 
 If you run more than one Zerodha account — your own, a family member's, an HUF — each

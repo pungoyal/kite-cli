@@ -68,6 +68,10 @@ Trading:
 Streaming:
   watch [options] [instruments...]  Stream live quotes in a self-updating table
 
+Integrations:
+  mcp                               Run a read-only MCP server over stdio for
+                                    LLM agents (Claude and others)
+
 Settings:
   config                            View and change CLI settings
   doctor                            Run offline health checks on your
@@ -843,6 +847,17 @@ Options:
   --fps <n>          Screen repaints per second (default: "4")
   --orders           Also print live order updates
   -h, --help         display help for command
+```
+
+## `kite mcp`
+
+```
+Usage: kite mcp [options]
+
+Run a read-only MCP server over stdio for LLM agents (Claude and others)
+
+Options:
+  -h, --help  display help for command
 ```
 
 ## `kite config`
