@@ -178,6 +178,16 @@ describe('error mapping', () => {
     expect(error.exitCode).toBe(ExitCode.Upstream);
   });
 
+  it('surfaces the underlying cause of a fetch failure, not just "fetch failed"', async () => {
+    pool()
+      .intercept({ path: '/user/profile', method: 'GET' })
+      .replyWithError(new Error('connect ECONNREFUSED 1.2.3.4:443'));
+
+    const error = await new KiteApi(makeClient()).getProfile().catch((e) => e);
+    expect(error.message).toContain('fetch failed');
+    expect(error.message).toContain('connect ECONNREFUSED 1.2.3.4:443');
+  });
+
   it('never leaks the access token in an error message', async () => {
     pool().intercept({ path: '/user/profile', method: 'GET' }).reply(400, {
       status: 'error',

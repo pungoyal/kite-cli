@@ -28,6 +28,9 @@ While the version is `0.x`, minor releases may contain breaking changes.
   can't open a browser), and while waiting for the callback you can press `c` to
   copy the URL to the clipboard. Pressing Ctrl-C during the wait now aborts on
   the first keypress instead of hanging until a second.
+- Network-failure errors ("Could not reach Kite") now include the underlying
+  cause (e.g. `ECONNRESET`, `ENOTFOUND`) instead of just the generic "fetch
+  failed" text, so a dropped connection can actually be diagnosed.
 
 ## [0.3.0] - 2026-07-22
 
