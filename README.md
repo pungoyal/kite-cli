@@ -28,6 +28,32 @@ $ kite holdings
   Day's change  +₹287.40
 ```
 
+## Why you can trust it
+
+It places real orders with real money, under an unofficial banner — so the safety
+is built into the architecture, and every claim below is verifiable rather than
+aspirational:
+
+- **Try it risk-free first.** Zerodha runs a public sandbox with fake money and no
+  subscription. `kite login --env sandbox` gives you a full session to rehearse
+  every command against before you ever point it at your own account.
+- **It never silently moves money.** Every order previews the *resolved* order —
+  the actual contract, lot size and computed value, not an echo of your flags —
+  and waits for confirmation. There is deliberately no config key that turns that
+  off ([Safety](#safety)).
+- **It never blindly retries a write.** Kite has no idempotency key, so a
+  timed-out order is genuinely ambiguous. Rather than retry, the CLI tags every
+  order and reconciles against the orderbook to tell you what actually happened
+  ([Safety](#safety)).
+- **Your secrets stay put.** The API secret lives in your OS keyring (or an
+  encrypted file), is never accepted as a command-line argument, and is scrubbed
+  from every log, error and stack trace — with [tests](https://github.com/pungoyal/kite-cli/blob/main/test/redact.test.ts)
+  that prove it ([Security](#security)).
+- **Verifiable builds.** Published only from CI via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/)
+  (OIDC, no long-lived token). Check the provenance yourself with `npm audit signatures`.
+- **A small, auditable surface.** ~10 direct dependencies, most of them
+  zero-dependency, enforced by a dependency budget in CI.
+
 ## Install
 
 ```bash
@@ -38,7 +64,21 @@ Requires **Node 22.12 or newer**.
 
 ## Getting started
 
-You need a [Kite Connect](https://developers.kite.trade) app to get an API key and secret. Set your app's redirect URL to:
+**Kick the tyres first — no account, no subscription, no risk.** Zerodha runs a
+public sandbox with fake money, and every command behaves exactly as it does
+against a real account:
+
+```bash
+kite login --env sandbox
+kite --env sandbox holdings
+kite --env sandbox orders place NSE:INFY --side BUY --quantity 1 --dry-run
+```
+
+Learn the commands and see the confirmations there before any real money is
+involved.
+
+**Then connect your own account.** You need a [Kite Connect](https://developers.kite.trade)
+app to get an API key and secret. Set your app's redirect URL to:
 
 ```
 http://127.0.0.1:51101/callback
@@ -51,13 +91,6 @@ kite login
 ```
 
 This opens your browser, you log in to Zerodha normally (including your TOTP), and the CLI captures the callback on loopback. The login URL is also printed to the terminal — press `c` while it's waiting to copy it to your clipboard (handy if the browser didn't open, or you want to log in on another device). Your API secret goes into your OS keyring; the daily access token is stored alongside it.
-
-**Want to try it without a subscription or real money?** Zerodha runs a public sandbox:
-
-```bash
-kite login --env sandbox
-kite --env sandbox holdings
-```
 
 **Running more than one Zerodha account?** See [Multiple accounts](#multiple-accounts).
 
