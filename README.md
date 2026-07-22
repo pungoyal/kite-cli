@@ -200,6 +200,7 @@ kite orders list --open                # working orders only
 kite orders get 250720000123456        # full state history and fills
 kite orders modify <id> --price 1520
 kite orders cancel <id>
+kite orders reconcile <tag>            # did an order that seemed to fail actually reach Kite?
 kite trades                            # today's fills
 
 kite gtt list
@@ -406,6 +407,17 @@ $ kite orders place NSE:INFY -s BUY -q 10 --type LIMIT --price 1500 --yes
 ! The order DID reach Kite: 250720000123456 (COMPLETE).
 · It was not placed twice. Do not re-run this command.
 ```
+
+That reconciliation happens automatically, but only while the placing process is alive. If you lose it — a killed shell, a crashed script, a slept laptop — run it again on demand:
+
+```console
+$ kite orders reconcile kcmrt88o648c1bce
+✓ Found an order for tag kcmrt88o648c1bce:
+  … COMPLETE …
+· If placing this order looked like it failed, it went through — do not place it again.
+```
+
+With no tag, `kite orders reconcile` lists the orders this CLI placed today, and `--json` carries a `placed` boolean for scripts.
 
 Automatic retries are restricted to `GET`/`HEAD` at the transport layer. `POST`, `PUT` and `DELETE` are never retried — in this API those are place, modify and cancel.
 
