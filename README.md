@@ -54,22 +54,25 @@ aspirational:
 - **A small, auditable surface.** ~10 direct dependencies, most of them
   zero-dependency, enforced by a dependency budget in CI.
 
-## How this compares
+## How it compares
 
-Zerodha's official [`pykiteconnect`](https://github.com/zerodha/pykiteconnect) and
-[`kiteconnectjs`](https://github.com/zerodha/kiteconnectjs) are **libraries** — you
-write and run code to use them. `kite-cli` is a tool built on top of that same idea:
+Zerodha maintains excellent official SDKs — [`pykiteconnect`](https://github.com/zerodha/pykiteconnect)
+and [`kiteconnectjs`](https://github.com/zerodha/kiteconnectjs). If you're building an
+application, reach for those: they give you the full API, programmatically, and they're
+the foundation the whole ecosystem is built on. `kite-cli` is complementary — the same
+API as a ready-to-use tool, for when you'd rather not write code:
 
-- **Nothing to write for everyday use.** `kite holdings`, `kite watch --holdings`,
+- **Zero code for everyday use.** `kite holdings`, `kite watch --holdings`,
   `kite orders place …` run straight from the shell — and from any language that can
   shell out.
-- **Safety rails the raw SDKs leave to you.** Kill switch, per-order value cap,
-  resolved-order confirmation, and unique-tag reconciliation for ambiguous writes are
-  built in, not your responsibility to implement.
+- **An opinionated safety layer.** A kill switch, per-order value cap, resolved-order
+  confirmation, and unique-tag reconciliation for ambiguous writes come built in —
+  decisions the official SDKs deliberately leave open so each application can make its
+  own.
 - **Composable output.** Every command speaks `--json` on stdout, so it drops
   straight into `jq`, cron jobs, and pipelines.
-- **Still a library when you need one.** The same client is [exported](#library-use),
-  so you can start in the shell and drop down to code without switching tools.
+- **A library too, when you need one.** The same client is [exported](#library-use),
+  so you can start in the shell and drop into code without switching tools.
 
 ## Install
 
@@ -469,6 +472,8 @@ searchable site at **[pungoyal.github.io/kite-cli](https://pungoyal.github.io/ki
 
 - [Safety model](https://pungoyal.github.io/kite-cli/safety) — the full layered safety model (kill
   switch, value cap, confirmation escalation, order-tag reconciliation).
+- [MCP server](https://pungoyal.github.io/kite-cli/mcp) — the read-only Model Context Protocol
+  server for LLM agents: its tools, setup, and why it exposes no writes.
 - [Configuration](https://pungoyal.github.io/kite-cli/configuration) — every config key and
   environment variable, with precedence.
 - [Troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) — symptom-first fixes
