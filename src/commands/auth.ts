@@ -236,7 +236,9 @@ async function callbackFlow(ctx: Context, loginUrl: string): Promise<string> {
  * SIGINT). Returns a no-op when stdin is not a TTY, and an idempotent cleanup
  * that both the caller and the Ctrl-C path can safely call.
  */
-function listenForKeys(ctx: Context, loginUrl: string, onInterrupt: () => void): () => void {
+// Exported for tests: the raw-mode lifecycle (enter, restore, detach) and the
+// Ctrl-C byte path are the risky parts, and a real TTY can't be driven in CI.
+export function listenForKeys(ctx: Context, loginUrl: string, onInterrupt: () => void): () => void {
   const { io } = ctx;
   const stdin = process.stdin;
   if (!stdin.isTTY) return () => {};
