@@ -242,7 +242,14 @@ export class KiteClient {
       return new KiteCliError('Cancelled.', ExitCode.Aborted);
     }
     const message = err instanceof Error ? err.message : String(err);
-    return new NetworkError(`Could not reach Kite: ${redactString(message)}`, 'Check your network connection.');
+    // undici's fetch wraps the actual failure (ECONNRESET, ENOTFOUND, a TLS
+    // error, ...) in `cause` and sets `message` to the unhelpful constant
+    // "fetch failed" — surface the cause too, or every transient network
+    // problem looks identical and undebuggable.
+    const cause = err instanceof Error ? err.cause : undefined;
+    const causeMessage = cause instanceof Error ? cause.message : cause !== undefined ? String(cause) : undefined;
+    const detail = causeMessage && causeMessage !== message ? `${message}: ${causeMessage}` : message;
+    return new NetworkError(`Could not reach Kite: ${redactString(detail)}`, 'Check your network connection.');
   }
 
   private handleResponse<S extends z.ZodType>(response: FetchResponse, text: string, schema: S, url: URL): z.infer<S> {
