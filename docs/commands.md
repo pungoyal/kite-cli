@@ -46,6 +46,9 @@ Portfolio:
   convert [options] <instrument>    Convert a position between products (e.g.
                                     MIS to CNC)
 
+Mutual funds:
+  mf                                View mutual fund holdings, orders and SIPs
+
 Market data:
   quote [options] <instruments...>  Show full quotes with market depth
   ltp <instruments...>              Show last traded prices (fastest quote
@@ -275,6 +278,56 @@ Options:
   --transaction-type <type>  BUY or SELL (default: "BUY")
   --position-type <type>     overnight or day (default: "day")
   -h, --help                 display help for command
+```
+
+## `kite mf`
+
+```
+Usage: kite mf [options] [command]
+
+View mutual fund holdings, orders and SIPs
+
+Options:
+  -h, --help      display help for command
+
+Commands:
+  holdings        Show your mutual fund holdings
+  orders          Show mutual fund orders from the last 7 days
+  sips            Show your mutual fund SIPs
+  help [command]  display help for command
+```
+
+### `kite mf holdings`
+
+```
+Usage: kite mf holdings [options]
+
+Show your mutual fund holdings
+
+Options:
+  -h, --help  display help for command
+```
+
+### `kite mf orders`
+
+```
+Usage: kite mf orders [options]
+
+Show mutual fund orders from the last 7 days
+
+Options:
+  -h, --help  display help for command
+```
+
+### `kite mf sips`
+
+```
+Usage: kite mf sips [options]
+
+Show your mutual fund SIPs
+
+Options:
+  -h, --help  display help for command
 ```
 
 ## `kite quote`
