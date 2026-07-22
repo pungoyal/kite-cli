@@ -10,6 +10,12 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ### Added
 
+- `kite doctor` runs offline health checks — Node version, config file existence
+  and permissions, OS keyring reachability, whether an API secret is stored, the
+  cached session's expiry, and whether the login callback port is free — and
+  prints a pass/warn/fail report (`--json` for scripts). It makes no network
+  call: it exits non-zero only on a hard failure, and points at `kite whoami` to
+  confirm the session is live on Kite's side.
 - `kite completion <bash|zsh|fish>` prints a shell completion script (the shell
   is auto-detected from `$SHELL` when omitted). Completions are generated from
   the live command tree, so new commands and flags are completable without a
