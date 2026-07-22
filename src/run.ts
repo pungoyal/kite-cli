@@ -47,7 +47,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
 
   program
     .name('kite')
-    .description('Unofficial command-line interface for the Zerodha Kite Connect API (not affiliated with Zerodha)')
+    .description('Unofficial, safety-first CLI for the Zerodha Kite Connect v3 API (not affiliated with Zerodha)')
     .version(VERSION, '-v, --version')
     .showHelpAfterError('(run `kite --help` for usage)')
     .configureOutput({

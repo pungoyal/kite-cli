@@ -13,8 +13,8 @@ and config-key reference. The block below is `kite --help` itself:
 ```
 Usage: kite [options] [command]
 
-Unofficial command-line interface for the Zerodha Kite Connect API (not
-affiliated with Zerodha)
+Unofficial, safety-first CLI for the Zerodha Kite Connect v3 API (not affiliated
+with Zerodha)
 
 Options:
   -v, --version                     output the version number
