@@ -12,13 +12,28 @@ permissions:
 
 jobs:
   test:
-    name: Test (Node ${{ matrix.node }})
-    runs-on: ubuntu-latest
+    # Linux jobs keep their original "Test (Node X)" names — those are the
+    # required status checks in branch protection, and renaming them would leave
+    # protection waiting forever on contexts that never report. The macOS job
+    # gets an OS-qualified name so it is a distinct (non-required) check.
+    name: Test (${{ matrix.os == 'ubuntu-latest' && format('Node {0}', matrix.node) || format('{0}, Node {1}', matrix.os, matrix.node) }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         # 22.12 is the floor declared in engines; 24 is Active LTS; 26 is Current.
         node: ['22.12', '24', '26']
+        include:
+          # A macOS runner exercises the darwin build the Linux jobs never touch:
+          # native-module resolution, path handling, the spawned-binary smoke
+          # test, and the scrypt/AES file-backed credential store. The OS keyring
+          # itself stays out of CI on purpose — the suite sets KITE_DISABLE_KEYRING
+          # so a run can never read or write a contributor's real keychain — so
+          # this is portability coverage, not keyring coverage. Windows is a
+          # tracked follow-up (a few tests still assume POSIX file modes).
+          - os: macos-latest
+            node: '24'
     steps:
       # Actions are pinned to full commit SHAs, not tags — tags are mutable and
       # a compromised upstream can repoint them (cf. the tj-actions breach).
@@ -47,7 +62,10 @@ jobs:
         run: npm run build
 
       - name: Assert the shebang survived the build
-        # Silent, total breakage that no unit test catches.
+        # Silent, total breakage that no unit test catches. `shell: bash` pins the
+        # interpreter across every runner OS (Git Bash on Windows) so this POSIX
+        # one-liner stays valid as the matrix grows.
+        shell: bash
         run: |
           head -1 dist/cli.js | grep -qx '#!/usr/bin/env node' \
             || { echo "dist/cli.js is missing its shebang"; exit 1; }

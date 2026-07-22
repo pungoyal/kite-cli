@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, expect } from 'vitest';
 
@@ -14,9 +16,12 @@ import { afterEach, beforeEach, expect } from 'vitest';
 const REAL_CREDENTIAL_VARS = ['KITE_API_SECRET', 'KITE_ACCESS_TOKEN', 'KITE_API_KEY'];
 
 beforeEach(() => {
-  // Sandbox all filesystem state into a per-run temp directory.
-  process.env['KITE_CONFIG_DIR'] = `${process.env['VITEST_TMP'] ?? '/tmp'}/kite-cli-test-${process.pid}/config`;
-  process.env['KITE_CACHE_DIR'] = `${process.env['VITEST_TMP'] ?? '/tmp'}/kite-cli-test-${process.pid}/cache`;
+  // Sandbox all filesystem state into a per-run temp directory. Rooted at the
+  // OS temp dir (not a hardcoded /tmp) so the suite is portable to runners that
+  // have no /tmp; VITEST_TMP still overrides when set.
+  const tmpRoot = join(process.env['VITEST_TMP'] ?? tmpdir(), `kite-cli-test-${process.pid}`);
+  process.env['KITE_CONFIG_DIR'] = join(tmpRoot, 'config');
+  process.env['KITE_CACHE_DIR'] = join(tmpRoot, 'cache');
   // Never read or write the developer's actual keychain.
   process.env['KITE_DISABLE_KEYRING'] = '1';
 
