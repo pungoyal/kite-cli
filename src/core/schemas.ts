@@ -496,6 +496,7 @@ export const BasketMarginSchema = z.looseObject({
   orders: z.array(OrderMarginSchema).default([]),
   charges: z.unknown().optional(),
 });
+export type BasketMargin = z.infer<typeof BasketMarginSchema>;
 
 // ---------------------------------------------------------------------------
 // Mutual funds (read-only: the current docs state order placement is not

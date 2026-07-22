@@ -10,6 +10,14 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ### Added
 
+- `margins` command group wrapping Kite's calculators (nothing is placed):
+  `margins order` (required margin per order), `margins basket` (net margin for
+  a set, with spread/hedge benefit and `--[no-]consider-positions`), and
+  `margins charges` (itemised brokerage/tax breakdown — a virtual contract
+  note). Orders are given as positional `EXCHANGE:SYMBOL:SIDE:QTY[:…]` specs.
+  `margins charges` requires a non-zero price, since charges are a percentage of
+  quantity × price and a zero would compute a plausible-looking ≈₹0.
+
 - `mf` command group exposing the mutual-fund read endpoints: `mf holdings`
   (holdings with P&L), `mf orders` (orders from the last 7 days), and `mf sips`
   (your SIPs). Mutual funds remain read-only over Kite Connect.

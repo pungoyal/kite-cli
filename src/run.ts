@@ -93,6 +93,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
   const { orderCommands } = await import('./commands/orders.js');
   const { gttCommands } = await import('./commands/gtt.js');
   const { alertCommands } = await import('./commands/alerts.js');
+  const { marginCommands } = await import('./commands/margins.js');
   const { mfCommands } = await import('./commands/mf.js');
   const { watchCommands } = await import('./commands/watch.js');
   const { configCommands } = await import('./commands/config.js');
@@ -117,6 +118,7 @@ export async function run(opts: RunOptions = {}): Promise<ExitCodeValue> {
   orderCommands(program, withContext);
   gttCommands(program, withContext);
   alertCommands(program, withContext);
+  marginCommands(program, withContext);
 
   program.commandsGroup('Streaming:');
   watchCommands(program, withContext);
