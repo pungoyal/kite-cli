@@ -196,6 +196,25 @@ instead of a constant with `--rhs-instrument EXCHANGE:SYMBOL`.
 
 Add `--dry-run` to any of these to see exactly what would be sent, without sending it.
 
+### Margins & charges
+
+Work out what an order or a basket would cost before placing it. Nothing is
+sent to the exchange — these only call Kite's calculators:
+
+```bash
+kite margins order NFO:NIFTY25AUGFUT:BUY:75:NRML       # required margin, per order
+kite margins basket NFO:NIFTY25AUGFUT:BUY:75:NRML \
+  NFO:NIFTY25AUGFUT:SELL:75:NRML                        # net margin, with hedge benefit
+kite margins charges NSE:INFY:BUY:10:1500              # brokerage + taxes (contract note)
+```
+
+Each order is `EXCHANGE:SYMBOL:SIDE:QTY` followed by optional attributes (an
+order type, product, variety, a bare price, or `trigger=<n>`), in any order;
+product defaults to CNC and variety to regular. `margins basket` accepts
+`--no-consider-positions` to ignore your existing positions when netting.
+`margins charges` needs a real price (the execution price), since charges are a
+percentage of quantity × price.
+
 ### Scripting
 
 Every command supports `--json`, writes data to stdout and everything else to stderr, and returns a meaningful exit code.

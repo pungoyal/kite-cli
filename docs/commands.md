@@ -62,6 +62,8 @@ Trading:
   trades                            Show today's executed trades
   gtt                               Manage Good Till Triggered orders
   alerts                            Manage price alerts
+  margins                           Calculate order margins and charges (nothing
+                                    is placed)
 
 Streaming:
   watch [options] [instruments...]  Stream live quotes in a self-updating table
@@ -744,6 +746,78 @@ Delete one or more alerts
 
 Arguments:
   uuid        One or more alert UUIDs
+
+Options:
+  -h, --help  display help for command
+```
+
+## `kite margins`
+
+```
+Usage: kite margins [options] [command]
+
+Calculate order margins and charges (nothing is placed)
+
+Options:
+  -h, --help                    display help for command
+
+Commands:
+  order <orders...>             Required margin for each order on its own
+  basket [options] <orders...>  Net margin for a basket of orders, with
+                                spread/hedge benefit
+  charges <orders...>           Itemised charges for a set of executed orders
+                                (virtual contract note)
+  help [command]                display help for command
+```
+
+### `kite margins order`
+
+```
+Usage: kite margins order [options] <orders...>
+
+Required margin for each order on its own
+
+Arguments:
+  orders      Each order is
+              EXCHANGE:SYMBOL:SIDE:QTY[:TYPE][:PRODUCT][:VARIETY][:PRICE][:trigger=<n>],
+              e.g. 'NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML'. Product defaults to
+              CNC, variety to regular.
+
+Options:
+  -h, --help  display help for command
+```
+
+### `kite margins basket`
+
+```
+Usage: kite margins basket [options] <orders...>
+
+Net margin for a basket of orders, with spread/hedge benefit
+
+Arguments:
+  orders                   Each order is
+                           EXCHANGE:SYMBOL:SIDE:QTY[:TYPE][:PRODUCT][:VARIETY][:PRICE][:trigger=<n>],
+                           e.g. 'NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML'. Product
+                           defaults to CNC, variety to regular.
+
+Options:
+  --no-consider-positions  Ignore existing positions when netting
+  -h, --help               display help for command
+```
+
+### `kite margins charges`
+
+```
+Usage: kite margins charges [options] <orders...>
+
+Itemised charges for a set of executed orders (virtual contract note)
+
+Arguments:
+  orders      Each order is
+              EXCHANGE:SYMBOL:SIDE:QTY[:TYPE][:PRODUCT][:VARIETY][:PRICE][:trigger=<n>],
+              e.g. 'NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML'. Product defaults to
+              CNC, variety to regular. A non-zero price (the execution price) is
+              required.
 
 Options:
   -h, --help  display help for command
