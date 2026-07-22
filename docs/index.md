@@ -48,3 +48,18 @@ npm install -g @pungoyal/kite-cli
 Requires **Node 22.12 or newer**. Full installation and everyday-usage walkthrough lives in the
 [README on GitHub](https://github.com/pungoyal/kite-cli#readme); these pages are the deeper
 reference behind it.
+
+## Try it before you trust it
+
+It moves real money, so convince yourself first. Zerodha runs a public sandbox with
+fake money and no subscription:
+
+```bash
+kite login --env sandbox
+kite --env sandbox holdings
+kite --env sandbox orders place NSE:INFY --side BUY --quantity 1 --dry-run
+```
+
+Every command behaves exactly as it does against a real account. And because the
+package is published only from CI via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/),
+you can verify the build provenance yourself with `npm audit signatures`.
