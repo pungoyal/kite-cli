@@ -527,6 +527,7 @@ export const MfOrderSchema = z.looseObject({
   amount: z.number().nullish(),
   average_price: z.number().nullish(),
 });
+export type MfOrder = z.infer<typeof MfOrderSchema>;
 
 export const MfSipSchema = z.looseObject({
   sip_id: z.string(),
@@ -538,6 +539,7 @@ export const MfSipSchema = z.looseObject({
   frequency: z.string().optional(),
   next_instalment: z.string().nullish(),
 });
+export type MfSip = z.infer<typeof MfSipSchema>;
 
 // ---------------------------------------------------------------------------
 // Instruments (parsed from the daily CSV dump)

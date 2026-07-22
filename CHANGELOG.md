@@ -10,6 +10,9 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ### Added
 
+- `mf` command group exposing the mutual-fund read endpoints: `mf holdings`
+  (holdings with P&L), `mf orders` (orders from the last 7 days), and `mf sips`
+  (your SIPs). Mutual funds remain read-only over Kite Connect.
 - `alerts create` now accepts a repeatable `--order` flag, so an ATO alert can
   place a basket of orders — each on its own instrument, independent of the
   watched one (e.g. watch `NSE:INDIGO`, fire an order on `NFO:INDIGO25AUGFUT`).

@@ -78,6 +78,19 @@ kite authorise                   # authorise demat holdings for selling
 
 If a sell order fails with exit code 12 ("needs authorisation at depository"), run `kite authorise` — it requests a CDSL authorisation and opens the browser page that completes it. Pass specific ISINs to authorise only those instruments.
 
+### Mutual funds
+
+```bash
+kite mf holdings                 # your MF holdings with P&L
+kite mf orders                   # MF orders from the last 7 days
+kite mf sips                     # your active SIPs
+```
+
+Mutual funds are read-only over Kite Connect — placing MF orders and managing
+SIPs is not available via the API (a purchase needs a bank debit the API can't
+authorise). `mf orders` only reaches back 7 days, so an empty list doesn't mean
+you have no MF history.
+
 ### Market data
 
 ```bash
