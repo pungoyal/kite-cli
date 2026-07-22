@@ -462,6 +462,8 @@ Options:
 Commands:
   list [options]                Show today's orderbook
   get <order-id>                Show the full state history of one order
+  reconcile [tag]               Check whether a tagged order reached Kite
+                                (recovery after an ambiguous failure)
   place [options] <instrument>  Place an order
   modify [options] <order-id>   Modify a pending order
   cancel [options] <order-id>   Cancel a pending order
@@ -486,6 +488,21 @@ Options:
 Usage: kite orders get [options] <order-id>
 
 Show the full state history of one order
+
+Options:
+  -h, --help  display help for command
+```
+
+### `kite orders reconcile`
+
+```
+Usage: kite orders reconcile [options] [tag]
+
+Check whether a tagged order reached Kite (recovery after an ambiguous failure)
+
+Arguments:
+  tag         Order tag to look up; omit to list the orders this CLI placed
+              today
 
 Options:
   -h, --help  display help for command

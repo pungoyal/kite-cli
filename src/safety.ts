@@ -225,7 +225,16 @@ function accountLine(ctx: Context): string {
  *
  * Kite caps `tag` at 20 alphanumeric characters.
  */
-export function generateOrderTag(prefix = 'kc'): string {
+/**
+ * Prefix on every tag the CLI generates for an order it places.
+ *
+ * It lets the orderbook be filtered back to orders this tool placed — which is
+ * what `orders reconcile` (with no tag) uses to surface CLI-issued orders. Only
+ * the auto-generated tag carries it; a user-supplied `--tag` is kept verbatim.
+ */
+export const CLI_TAG_PREFIX = 'kc';
+
+export function generateOrderTag(prefix = CLI_TAG_PREFIX): string {
   const random = randomBytes(6).toString('hex');
   const stamp = Date.now().toString(36);
   return `${prefix}${stamp}${random}`.slice(0, 20);

@@ -19,6 +19,15 @@ While the version is `0.x`, minor releases may contain breaking changes.
   deliberately not exposed. The server is hand-rolled (no new dependencies, in
   keeping with the dependency budget), requires a live session, and redacts
   every tool result like the rest of the transport.
+- `kite orders reconcile [tag]` makes the order-tag recovery path a first-class
+  command. `orders place` already reconciles automatically the instant a
+  placement fails — but that check is lost if the process is killed, a script
+  crashes, or the terminal closes. This re-runs it on demand: given the unique
+  tag every order carries, `kite orders reconcile <tag>` looks up the orderbook
+  and reports whether the order actually reached Kite, so you know whether it is
+  safe to place again. With no tag it lists the orders this CLI placed today. It
+  is a query, not a mutation — it exits `0` on any clean answer, and `--json`
+  carries a `placed` boolean as the machine-readable verdict.
 
 ## [0.4.0] - 2026-07-22
 

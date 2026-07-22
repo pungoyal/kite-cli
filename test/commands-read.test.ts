@@ -190,3 +190,79 @@ it('a failed read maps the Kite error to the documented exit code', async () => 
   const code = await invoke(['holdings', '--json']);
   expect(code).toBe(ExitCode.Auth);
 });
+
+// --- orders reconcile ------------------------------------------------------
+//
+// The standalone recovery path for the no-idempotency problem: given the unique
+// tag every CLI order carries, answer "did it actually reach Kite?" so the user
+// knows whether it is safe to place again.
+
+it('orders reconcile <tag>: reports a matching order as placed', async () => {
+  pool()
+    .intercept({ path: '/orders', method: 'GET' })
+    .reply(200, {
+      status: 'success',
+      data: [
+        { order_id: '111', status: 'COMPLETE', tradingsymbol: 'INFY', exchange: 'NSE', quantity: 1, tag: 'kcabc123' },
+        { order_id: '222', status: 'OPEN', tradingsymbol: 'TCS', exchange: 'NSE', quantity: 1, tag: 'other' },
+      ],
+    });
+
+  const code = await invoke(['orders', 'reconcile', 'kcabc123', '--json']);
+  expect(code).toBe(ExitCode.Ok);
+  const doc = JSON.parse(out);
+  expect(doc.placed).toBe(true);
+  expect(doc.order_ids).toEqual(['111']);
+});
+
+it('orders reconcile <tag>: reports an absent tag as not placed', async () => {
+  pool()
+    .intercept({ path: '/orders', method: 'GET' })
+    .reply(200, {
+      status: 'success',
+      data: [
+        { order_id: '111', status: 'COMPLETE', tradingsymbol: 'INFY', exchange: 'NSE', quantity: 1, tag: 'kcabc' },
+      ],
+    });
+
+  const code = await invoke(['orders', 'reconcile', 'kcMISSING', '--json']);
+  // A clean "not found" is a valid answer, not a failure.
+  expect(code).toBe(ExitCode.Ok);
+  const doc = JSON.parse(out);
+  expect(doc.placed).toBe(false);
+  expect(doc.order_ids).toEqual([]);
+});
+
+it('orders reconcile <tag>: matches a tag in the repeated `tags` array too', async () => {
+  pool()
+    .intercept({ path: '/orders', method: 'GET' })
+    .reply(200, {
+      status: 'success',
+      data: [
+        { order_id: '333', status: 'COMPLETE', tradingsymbol: 'INFY', exchange: 'NSE', quantity: 1, tags: ['kczzz9'] },
+      ],
+    });
+
+  const code = await invoke(['orders', 'reconcile', 'kczzz9', '--json']);
+  expect(code).toBe(ExitCode.Ok);
+  expect(JSON.parse(out).order_ids).toEqual(['333']);
+});
+
+it('orders reconcile (no tag): lists only orders this CLI placed', async () => {
+  pool()
+    .intercept({ path: '/orders', method: 'GET' })
+    .reply(200, {
+      status: 'success',
+      data: [
+        { order_id: '111', status: 'COMPLETE', tradingsymbol: 'INFY', exchange: 'NSE', quantity: 1, tag: 'kcaaa' },
+        { order_id: '222', status: 'OPEN', tradingsymbol: 'TCS', exchange: 'NSE', quantity: 1, tag: 'manual' },
+        { order_id: '333', status: 'OPEN', tradingsymbol: 'WIPRO', exchange: 'NSE', quantity: 1 },
+      ],
+    });
+
+  const code = await invoke(['orders', 'reconcile', '--json']);
+  expect(code).toBe(ExitCode.Ok);
+  const ids = JSON.parse(out).map((o: { order_id: string }) => o.order_id);
+  // Only the kc-prefixed order; the manually-tagged and untagged ones are excluded.
+  expect(ids).toEqual(['111']);
+});

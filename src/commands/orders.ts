@@ -17,7 +17,7 @@ import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js'
 import { type Order, TERMINAL_ORDER_STATUSES, type Trade } from '../core/schemas.js';
 import { dateTime, money, quantity, rupees, timeOnly } from '../output/format.js';
 import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
-import { assertTradingEnabled, buildOrderTag, confirmAction } from '../safety.js';
+import { assertTradingEnabled, buildOrderTag, CLI_TAG_PREFIX, confirmAction } from '../safety.js';
 import type { CommandFactory } from './types.js';
 
 export const orderCommands: CommandFactory = (program, run) => {
@@ -34,6 +34,12 @@ export const orderCommands: CommandFactory = (program, run) => {
     .description('Show the full state history of one order')
     .argument('<order-id>')
     .action(run(getOrder));
+
+  orders
+    .command('reconcile')
+    .description('Check whether a tagged order reached Kite (recovery after an ambiguous failure)')
+    .argument('[tag]', 'Order tag to look up; omit to list the orders this CLI placed today')
+    .action(run(reconcileOrders));
 
   orders
     .command('place')
@@ -528,6 +534,82 @@ async function reconcileAfterFailure(ctx: Context, tag: string, cause: Error): P
     io.error(`Check your orderbook manually for tag ${io.bold(tag)} BEFORE retrying.`);
     process.exitCode = ExitCode.Upstream;
   }
+}
+
+/**
+ * Standalone, after-the-fact reconciliation for the no-idempotency problem.
+ *
+ * `orders place` reconciles automatically the instant a placement fails (see
+ * {@link reconcileAfterFailure}), but that check lives and dies with the
+ * process — a killed shell, a crashed script, a slept laptop and it is gone.
+ * This re-runs it on demand. Given the unique tag every order carries, it
+ * answers the only question that matters after an ambiguous failure — "did it
+ * actually reach Kite?" — so you know whether it is safe to place again.
+ *
+ * With a tag, it looks that tag up. With none, it lists the orders this CLI
+ * placed today (those carrying the {@link CLI_TAG_PREFIX} prefix), so you can
+ * still find one whose exact tag you did not capture. It is a query, not a
+ * mutation: it exits 0 on any clean answer, and the `--json` `placed` flag is
+ * the machine-readable verdict.
+ */
+async function reconcileOrders(ctx: Context, _opts: unknown, command: { args: string[] }): Promise<void> {
+  ctx.requireSession();
+  const { io } = ctx;
+  const tag = command.args[0];
+
+  if (tag) {
+    const matches = await ctx.api.findOrderByTag(tag, ctx.signal);
+    if (io.json) {
+      io.writeJson({ tag, placed: matches.length > 0, order_ids: matches.map((o) => o.order_id), orders: matches });
+      return;
+    }
+    if (matches.length === 0) {
+      io.warn(`No order found for tag ${io.bold(tag)}.`);
+      io.info(
+        'If a placement looked like it failed, it most likely did not reach Kite — but check `kite orders list` before retrying, in case it simply has not appeared yet.',
+      );
+      return;
+    }
+    io.success(`Found ${matches.length === 1 ? 'an order' : `${matches.length} orders`} for tag ${io.bold(tag)}:`);
+    io.line(renderTableFor(ctx, matches, reconcileColumns()));
+    io.info('If placing this order looked like it failed, it went through — do not place it again.');
+    return;
+  }
+
+  const mine = (await ctx.api.getOrders(ctx.signal)).filter(hasCliTag);
+  printTable(io, mine, reconcileColumns(), mine, {
+    compact: ctx.config.output.compact,
+    empty: `No orders tagged by this CLI today (looking for the \`${CLI_TAG_PREFIX}\` prefix).`,
+  });
+  if (mine.length > 0 && !io.json) {
+    io.info('Reconcile a specific one with `kite orders reconcile <tag>`.');
+  }
+}
+
+/** True if this order carries a CLI-generated tag (see {@link CLI_TAG_PREFIX}). */
+function hasCliTag(order: Order): boolean {
+  if (order.tag?.startsWith(CLI_TAG_PREFIX)) return true;
+  return order.tags?.some((t) => t.startsWith(CLI_TAG_PREFIX)) ?? false;
+}
+
+function reconcileColumns(): Array<Column<Order>> {
+  return [
+    { header: 'Time', value: (o) => timeOnly(o.order_timestamp) },
+    { header: 'Order ID', value: (o, io) => io.dim(o.order_id) },
+    { header: 'Symbol', value: (o, io) => io.bold(o.tradingsymbol ?? '—') },
+    {
+      header: 'Side',
+      value: (o, io) =>
+        o.transaction_type === 'BUY' ? io.green('BUY') : o.transaction_type === 'SELL' ? io.red('SELL') : '—',
+    },
+    {
+      header: 'Qty',
+      value: (o) => `${quantity(o.filled_quantity ?? 0)}/${quantity(o.quantity ?? 0)}`,
+      align: 'right',
+    },
+    { header: 'Status', value: (o, io) => colourStatus(io, o.status) },
+    { header: 'Tag', value: (o) => o.tag ?? '—' },
+  ];
 }
 
 // ---------------------------------------------------------------------------
