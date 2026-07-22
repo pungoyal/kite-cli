@@ -110,10 +110,14 @@ function summaryOf(cmd: Command): string {
   return sanitize(text);
 }
 
-/** Strip characters that would break a quoted description in a shell script. */
+/**
+ * Strip characters that would break a quoted description in a shell script.
+ * Backslash is included: fish treats it as an escape inside single quotes, so a
+ * description ending in `\` would escape the closing quote and corrupt the line.
+ */
 function sanitize(text: string): string {
   return text
-    .replace(/['\n\r]/g, ' ')
+    .replace(/['\\\n\r]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -121,13 +125,20 @@ function sanitize(text: string): string {
 // --- rendering -------------------------------------------------------------
 
 export function renderScript(shell: Shell, model: CompletionModel): string {
+  // Sanitise at the rendering boundary, not only in buildModel(), so renderScript
+  // can never emit a script broken by a stray quote or backslash regardless of
+  // how its model was built.
+  const safe: CompletionModel = {
+    ...model,
+    descriptions: Object.fromEntries(Object.entries(model.descriptions).map(([key, value]) => [key, sanitize(value)])),
+  };
   switch (shell) {
     case 'bash':
-      return renderBash(model);
+      return renderBash(safe);
     case 'zsh':
-      return renderZsh(model);
+      return renderZsh(safe);
     case 'fish':
-      return renderFish(model);
+      return renderFish(safe);
   }
 }
 
@@ -199,18 +210,27 @@ _kite() {
 ${topDescribe}
   )
 
-  if (( CURRENT == 2 )); then
-    if [[ \${words[2]} == -* ]]; then
-      compadd ${model.globalFlags.join(' ')}
-    else
-      _describe 'command' commands
-    fi
+  # Flags complete anywhere the current word starts with a dash. \`compadd --\`
+  # is required: a bare \`compadd --json\` makes zsh parse the flags as its own
+  # options instead of as candidates.
+  if [[ \${words[CURRENT]} == -* ]]; then
+    compadd -- ${model.globalFlags.join(' ')}
     return
   fi
 
-  case \${words[2]} in
+  # Top-level command name.
+  if (( CURRENT == 2 )); then
+    _describe 'command' commands
+    return
+  fi
+
+  # Subcommands only at the subcommand position; deeper positions offer nothing,
+  # which caps depth at command -> subcommand as documented.
+  if (( CURRENT == 3 )); then
+    case \${words[2]} in
 ${subBlocks}
-  esac
+    esac
+  fi
 }
 compdef _kite kite
 `;
@@ -229,11 +249,16 @@ function renderFish(model: CompletionModel): string {
   for (const name of model.commands) {
     lines.push(`complete -c kite -n __fish_use_subcommand -a ${name} -d '${model.descriptions[name] ?? ''}'`);
   }
-  lines.push('', '# Subcommands.');
+  lines.push('', '# Subcommands (only until one is chosen, capping depth at command → subcommand).');
   for (const [cmd, subs] of Object.entries(model.subcommands)) {
+    // __fish_seen_subcommand_from is true anywhere the token appears on the
+    // line, so without the `and not …` guard `kite config set <TAB>` would keep
+    // re-offering config's subcommands. Excluding the subcommands themselves
+    // stops that once one has been typed.
+    const guard = `__fish_seen_subcommand_from ${cmd}; and not __fish_seen_subcommand_from ${subs.join(' ')}`;
     for (const sub of subs) {
       const desc = model.descriptions[`${cmd} ${sub}`] ?? '';
-      lines.push(`complete -c kite -n '__fish_seen_subcommand_from ${cmd}' -a ${sub} -d '${desc}'`);
+      lines.push(`complete -c kite -n '${guard}' -a ${sub} -d '${desc}'`);
     }
   }
   lines.push('', '# Global flags.');

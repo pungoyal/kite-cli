@@ -1,8 +1,30 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildModel, renderScript } from '../src/commands/completion.js';
 import { ExitCode } from '../src/core/errors.js';
 import { run } from '../src/run.js';
+
+/** True when a shell binary is on PATH, so its execution test can run. */
+function shellPresent(shell: string): boolean {
+  try {
+    execFileSync(shell, ['-c', 'exit 0'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Write a generated script to a fresh temp file and return its path. */
+function writeScript(shell: 'bash' | 'zsh' | 'fish', script: string): string {
+  const dir = mkdtempSync(join(tmpdir(), 'kite-comp-'));
+  const path = join(dir, `kite.${shell}`);
+  writeFileSync(path, script);
+  return path;
+}
 
 /**
  * Completion is generated from the live command tree, so these assert the model
@@ -41,18 +63,88 @@ describe('renderScript', () => {
     expect(script).toContain('--json --profile');
   });
 
-  it('zsh: carries the #compdef tag and command descriptions', () => {
+  it('zsh: carries the #compdef tag, uses `compadd --`, and caps depth at position 3', () => {
     const script = renderScript('zsh', model);
     expect(script.startsWith('#compdef kite')).toBe(true);
     expect(script).toContain("'holdings:Show holdings'");
     expect(script).toContain('compdef _kite kite');
+    // `compadd --` (not a bare `compadd --json`) so zsh treats the flags as
+    // candidates rather than its own options.
+    expect(script).toContain('compadd -- --json --profile');
+    // Subcommands are only offered at the subcommand position.
+    expect(script).toContain('(( CURRENT == 3 ))');
   });
 
-  it('fish: emits per-command complete lines', () => {
+  it('fish: guards subcommands so depth stays capped at command → subcommand', () => {
     const script = renderScript('fish', model);
     expect(script).toContain('complete -c kite -n __fish_use_subcommand -a holdings');
-    expect(script).toContain("complete -c kite -n '__fish_seen_subcommand_from config' -a set");
+    // The `and not …` guard stops a parent re-offering its subcommands once one
+    // has been chosen (bare __fish_seen_subcommand_from is true anywhere).
+    expect(script).toContain(
+      "complete -c kite -n '__fish_seen_subcommand_from config; and not __fish_seen_subcommand_from set get' -a set",
+    );
     expect(script).toContain('complete -c kite -l json');
+  });
+
+  it('strips quotes and backslashes from descriptions in every shell', () => {
+    const dirty = {
+      commands: ['x'],
+      subcommands: {},
+      globalFlags: ['--json'],
+      // A raw backslash and apostrophe that would otherwise break the quoting.
+      descriptions: { x: "a'b\\c" },
+    };
+    for (const shell of ['bash', 'zsh', 'fish'] as const) {
+      const script = renderScript(shell, dirty);
+      expect(script).not.toContain("a'b");
+      expect(script).not.toContain('b\\c');
+    }
+  });
+});
+
+// The generator's routing bugs (wrong candidates at depth, zsh flag parsing) are
+// invisible to substring assertions — they only surface when a shell runs the
+// script. These execute the real scripts, skipping any shell not installed.
+describe('generated scripts execute correctly', () => {
+  it.runIf(shellPresent('bash'))('bash: offers subcommands, caps depth, offers flags', async () => {
+    const path = writeScript('bash', renderScript('bash', await buildModel()));
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal bash parameter expansion for the harness, not a JS template
+    const reply = '"${COMPREPLY[*]}"';
+    const harness = [
+      `source ${path}`,
+      `COMP_WORDS=(kite config ""); COMP_CWORD=2; _kite; printf "SUB:%s\\n" ${reply}`,
+      `COMP_WORDS=(kite config set ""); COMP_CWORD=3; _kite; printf "DEEP:[%s]\\n" ${reply}`,
+      `COMP_WORDS=(kite --); COMP_CWORD=1; _kite; printf "FLAGS:%s\\n" ${reply}`,
+    ].join('\n');
+    const out = execFileSync('bash', ['--noprofile', '--norc', '-c', harness], { encoding: 'utf8' });
+    expect(out).toMatch(/SUB:.*\bset\b/); // subcommands at the subcommand position
+    expect(out).toContain('DEEP:[]'); // nothing past the subcommand — depth capped
+    expect(out).toMatch(/FLAGS:.*--json/); // global flags on a leading dash
+  });
+
+  it.runIf(shellPresent('zsh'))('zsh: routes to compadd/_describe and caps depth', async () => {
+    const path = writeScript('zsh', renderScript('zsh', await buildModel()));
+    const harness = [
+      'compadd() { print "compadd:$@"; }',
+      '_describe() { print "describe:$1"; }',
+      'compdef() { : ; }', // stub the trailing `compdef _kite kite`
+      `source ${path}`,
+      'words=(kite config set ""); CURRENT=4; print DEEP_START; _kite; print DEEP_END',
+      'words=(kite config ""); CURRENT=3; _kite',
+      'words=(kite "--"); CURRENT=2; _kite',
+    ].join('\n');
+    const out = execFileSync('zsh', ['-f', '-c', harness], { encoding: 'utf8' });
+    expect(out).toMatch(/DEEP_START\nDEEP_END/); // nothing offered between → depth capped
+    expect(out).toContain('describe:subcommand'); // subcommands at position 3
+    expect(out).toContain('compadd:-- --json'); // flags via `compadd --`
+  });
+
+  it.runIf(shellPresent('fish'))('fish: offers subcommands then caps depth', async () => {
+    const path = writeScript('fish', renderScript('fish', await buildModel()));
+    const at = (line: string) =>
+      execFileSync('fish', ['-c', `source ${path}; complete -C'${line}'`], { encoding: 'utf8' });
+    expect(at('kite config ')).toMatch(/\bset\b/); // subcommands offered
+    expect(at('kite config set ').trim()).toBe(''); // nothing past the subcommand
   });
 });
 
