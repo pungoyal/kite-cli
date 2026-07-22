@@ -8,19 +8,10 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-22
+
 ### Added
 
-- `margins` command group wrapping Kite's calculators (nothing is placed):
-  `margins order` (required margin per order), `margins basket` (net margin for
-  a set, with spread/hedge benefit and `--[no-]consider-positions`), and
-  `margins charges` (itemised brokerage/tax breakdown — a virtual contract
-  note). Orders are given as positional `EXCHANGE:SYMBOL:SIDE:QTY[:…]` specs.
-  `margins charges` requires a non-zero price, since charges are a percentage of
-  quantity × price and a zero would compute a plausible-looking ≈₹0.
-
-- `mf` command group exposing the mutual-fund read endpoints: `mf holdings`
-  (holdings with P&L), `mf orders` (orders from the last 7 days), and `mf sips`
-  (your SIPs). Mutual funds remain read-only over Kite Connect.
 - `alerts create` now accepts a repeatable `--order` flag, so an ATO alert can
   place a basket of orders — each on its own instrument, independent of the
   watched one (e.g. watch `NSE:INDIGO`, fire an order on `NFO:INDIGO25AUGFUT`).
@@ -31,6 +22,16 @@ While the version is `0.x`, minor releases may contain breaking changes.
   fails closed if any one can't be priced, and `--order` cannot be mixed with
   the single-order flags. The existing `--side`/`--quantity` flags stay as a
   shorthand for a single order on the watched instrument.
+- `mf` command group exposing the mutual-fund read endpoints: `mf holdings`
+  (holdings with P&L), `mf orders` (orders from the last 7 days), and `mf sips`
+  (your SIPs). Mutual funds remain read-only over Kite Connect.
+- `margins` command group wrapping Kite's calculators (nothing is placed):
+  `margins order` (required margin per order), `margins basket` (net margin for
+  a set, with spread/hedge benefit and `--[no-]consider-positions`), and
+  `margins charges` (itemised brokerage/tax breakdown — a virtual contract
+  note). Orders are given as positional `EXCHANGE:SYMBOL:SIDE:QTY[:…]` specs.
+  `margins charges` requires a non-zero price, since charges are a percentage of
+  quantity × price and a zero would compute a plausible-looking ≈₹0.
 
 ## [0.2.1] - 2026-07-21
 
@@ -130,7 +131,8 @@ provenance-backed release from CI).
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/pungoyal/kite-cli/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/pungoyal/kite-cli/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/pungoyal/kite-cli/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/pungoyal/kite-cli/compare/v0.1.0...v0.1.1
