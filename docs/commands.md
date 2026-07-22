@@ -70,6 +70,8 @@ Streaming:
 
 Settings:
   config                            View and change CLI settings
+  doctor                            Run offline health checks on your
+                                    configuration, credentials, and session
   completion [shell]                Print a shell completion script
 
 Commands:
@@ -904,6 +906,17 @@ Options:
 Usage: kite config path [options]
 
 Print the paths this CLI reads and writes
+
+Options:
+  -h, --help  display help for command
+```
+
+## `kite doctor`
+
+```
+Usage: kite doctor [options]
+
+Run offline health checks on your configuration, credentials, and session
 
 Options:
   -h, --help  display help for command

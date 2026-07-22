@@ -54,6 +54,7 @@ export async function registerCommands(program: Command, run: Runner): Promise<v
   const { mfCommands } = await import('./mf.js');
   const { watchCommands } = await import('./watch.js');
   const { configCommands } = await import('./config.js');
+  const { doctorCommands } = await import('./doctor.js');
   const { completionCommands } = await import('./completion.js');
 
   // commandsGroup applies to every command registered after it, so the group
@@ -83,5 +84,6 @@ export async function registerCommands(program: Command, run: Runner): Promise<v
 
   program.commandsGroup('Settings:');
   configCommands(program, run);
+  doctorCommands(program, run);
   completionCommands(program, run);
 }
