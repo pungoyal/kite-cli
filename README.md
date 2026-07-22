@@ -54,6 +54,23 @@ aspirational:
 - **A small, auditable surface.** ~10 direct dependencies, most of them
   zero-dependency, enforced by a dependency budget in CI.
 
+## How this compares
+
+Zerodha's official [`pykiteconnect`](https://github.com/zerodha/pykiteconnect) and
+[`kiteconnectjs`](https://github.com/zerodha/kiteconnectjs) are **libraries** — you
+write and run code to use them. `kite-cli` is a tool built on top of that same idea:
+
+- **Nothing to write for everyday use.** `kite holdings`, `kite watch --holdings`,
+  `kite orders place …` run straight from the shell — and from any language that can
+  shell out.
+- **Safety rails the raw SDKs leave to you.** Kill switch, per-order value cap,
+  resolved-order confirmation, and unique-tag reconciliation for ambiguous writes are
+  built in, not your responsibility to implement.
+- **Composable output.** Every command speaks `--json` on stdout, so it drops
+  straight into `jq`, cron jobs, and pipelines.
+- **Still a library when you need one.** The same client is [exported](#library-use),
+  so you can start in the shell and drop down to code without switching tools.
+
 ## Install
 
 ```bash
