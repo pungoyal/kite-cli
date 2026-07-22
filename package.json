@@ -1,16 +1,21 @@
 {
   "name": "@pungoyal/kite-cli",
   "version": "0.4.0",
-  "description": "Unofficial command-line interface for the Zerodha Kite Connect API — not affiliated with or endorsed by Zerodha",
+  "description": "Unofficial, safety-first CLI (and library) for the Zerodha Kite Connect v3 API — scriptable JSON, live streaming, and confirmations on anything that moves money. Not affiliated with or endorsed by Zerodha.",
   "keywords": [
     "zerodha",
     "kite",
     "kiteconnect",
+    "kite-connect",
     "trading",
+    "trading-api",
+    "algo-trading",
     "stocks",
     "cli",
+    "terminal",
     "nse",
-    "bse"
+    "bse",
+    "nifty"
   ],
   "license": "MIT",
   "author": "Puneet Goyal",
