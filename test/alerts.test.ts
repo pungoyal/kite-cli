@@ -430,6 +430,21 @@ describe('alerts enable/disable (through run)', () => {
     expect(err).toMatch(/deleted/i);
   });
 
+  it('points at `alerts modify`, not a nonexistent flag, when the alert has no operator to keep', async () => {
+    // `enable`/`disable` have no --operator flag, unlike `modify` — the error
+    // this shares with `modify` must not suggest one that doesn't exist here.
+    await seedSession({ trading: { enabled: true } });
+    const pool = agent.get('https://api.kite.trade');
+    const operatorless = { ...simpleAlert, operator: undefined };
+    pool.intercept({ path: '/alerts/alert-1', method: 'GET' }).reply(200, { status: 'success', data: operatorless });
+
+    const code = await invoke(['alerts', 'disable', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).not.toMatch(/--operator explicitly/i);
+    expect(err).toMatch(/kite alerts modify --operator/i);
+  });
+
   const atoAlert = {
     ...simpleAlert,
     uuid: 'alert-2',

@@ -705,7 +705,9 @@ async function modifyAlert(
  * `overrides.value` only takes effect when the alert's right-hand side is a
  * constant — an instrument-referencing RHS has no threshold to overwrite, so
  * it is silently ignored there rather than rejected, matching the pre-existing
- * `modify` behaviour this was extracted from.
+ * `modify` behaviour this was extracted from. `overrides.status` is used only
+ * by `enable`/`disable`; `modify` never sets it, so its PUT calls carry no
+ * `status` field, unchanged from before this helper existed.
  */
 function alertParamsFromExisting(
   existing: Alert,
@@ -714,7 +716,12 @@ function alertParamsFromExisting(
   const type = existing.type === 'ato' ? 'ato' : ('simple' as AlertType);
   const operator = overrides.operator ?? (existing.operator as AlertOperator);
   if (!operator || !(ALERT_OPERATORS as readonly string[]).includes(operator)) {
-    throw new UsageError('This alert has no valid operator to keep; pass --operator explicitly.');
+    // Shared by modify, enable and disable — none of which can assume the
+    // others' flags exist, so point at a command rather than a specific flag.
+    throw new UsageError(
+      'This alert has no valid operator to keep.',
+      'Run `kite alerts modify --operator <op>` to set one first.',
+    );
   }
 
   const rhsType = existing.rhs_type === 'instrument' ? 'instrument' : 'constant';
