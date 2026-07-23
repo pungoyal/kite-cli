@@ -8,6 +8,20 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- `kite alerts enable`/`kite alerts disable` pause or resume an alert without
+  deleting it. Kite's alerts API documents no `status` parameter on modify and
+  no dedicated toggle endpoint, so the CLI sends the request optimistically and
+  then re-reads it with a fresh `GET` (never trusting the PUT response's own
+  `status`, which could just echo the request back without persisting it)
+  before reporting success — if Kite silently ignores the field, the command
+  fails loudly (exit code 1) instead of claiming an alert is disabled while
+  it's still fully live. That matters most
+  for `ato` alerts, which place a real order when they fire, so re-enabling or
+  disabling one goes through the same kill-switch/confirmation gate as
+  `alerts modify`. An alert already in the requested state is a no-op.
+
 ### Removed
 
 - **Sandbox support (`--env`/`KITE_ENV`, the reserved `sandbox` profile) is

@@ -200,6 +200,8 @@ kite alerts list                       # your price alerts
 kite alerts create "INDICES:NIFTY 50" --operator above --value 27000
 kite alerts get <uuid>                 # detail, incl. any attached order
 kite alerts history <uuid>             # when it has fired
+kite alerts disable <uuid>             # pause without losing the definition
+kite alerts enable <uuid>
 kite alerts delete <uuid> [<uuid>...]
 ```
 
@@ -234,6 +236,13 @@ mutually exclusive.
 `--operator` accepts the raw symbols (`>=`, `<=`, `>`, `<`, `==`) or the aliases
 `above`, `below`, `ge`, `le`, `gt`, `lt`, `eq`. Compare against another instrument
 instead of a constant with `--rhs-instrument EXCHANGE:SYMBOL`.
+
+`kite alerts enable`/`disable` pause or resume an alert without deleting it.
+Kite's alerts API does not document a way to toggle status, so the CLI sends
+the request and then re-reads the alert to confirm it actually took effect —
+if Kite silently ignores it, the command fails loudly rather than reporting an
+alert as disabled while it's still live. That distinction matters most for ATO
+alerts, which place a real order when they fire.
 
 Add `--dry-run` to any of these to see exactly what would be sent, without sending it.
 
