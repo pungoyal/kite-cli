@@ -298,7 +298,7 @@ describe('alerts create --order (through run)', () => {
   });
 });
 
-describe('alerts enable/disable (through run)', () => {
+describe('alerts enable/disable/delete (through run)', () => {
   let agent: MockAgent;
   let stdout: PassThrough;
   let stderr: PassThrough;
@@ -494,5 +494,44 @@ describe('alerts enable/disable (through run)', () => {
     expect(code).toBe(ExitCode.Ok);
     const sentBasket = JSON.parse(new URLSearchParams(body).get('basket') ?? '{}');
     expect(sentBasket).toEqual(atoAlert.basket);
+  });
+
+  it('requires the kill switch to be on before deleting a confirmed ato alert', async () => {
+    // Deletion cancels a live order-arming trigger — the same gate `disable`
+    // applies, and the same gate `orders cancel`/`gtt delete` apply to their
+    // own unwind actions.
+    await seedSession({ trading: { enabled: false } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts', method: 'GET' }).reply(200, { status: 'success', data: [atoAlert] });
+
+    const code = await invoke(['alerts', 'delete', 'alert-2', '--yes']);
+
+    expect(code).toBe(ExitCode.TradingDisabled);
+  });
+
+  it('does not require the kill switch to delete a confirmed simple alert', async () => {
+    await seedSession({ trading: { enabled: false } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts', method: 'GET' }).reply(200, { status: 'success', data: [simpleAlert] });
+    pool
+      .intercept({ path: (p) => p.startsWith('/alerts') && !p.includes('history'), method: 'DELETE' })
+      .reply(200, { status: 'success', data: {} });
+
+    const code = await invoke(['alerts', 'delete', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+  });
+
+  it('fails closed and requires the kill switch when an alert cannot be verified before deletion', async () => {
+    // The lookup succeeds but doesn't contain this uuid (could equally be a
+    // total lookup failure) — an unverifiable alert is treated as though it
+    // might be ato, never assumed simple.
+    await seedSession({ trading: { enabled: false } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts', method: 'GET' }).reply(200, { status: 'success', data: [] });
+
+    const code = await invoke(['alerts', 'delete', 'unknown-uuid', '--yes']);
+
+    expect(code).toBe(ExitCode.TradingDisabled);
   });
 });

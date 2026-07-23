@@ -17,10 +17,20 @@ While the version is `0.x`, minor releases may contain breaking changes.
   `status`, which could just echo the request back without persisting it)
   before reporting success — if Kite silently ignores the field, the command
   fails loudly (exit code 1) instead of claiming an alert is disabled while
-  it's still fully live. That matters most
-  for `ato` alerts, which place a real order when they fire, so re-enabling or
-  disabling one goes through the same kill-switch/confirmation gate as
-  `alerts modify`. An alert already in the requested state is a no-op.
+  it's still fully live. That matters most for `ato` alerts, which place a
+  real order when they fire, so re-enabling or disabling one goes through the
+  same kill-switch/confirmation gate as `alerts modify`. An alert already in
+  the requested state is a no-op.
+
+### Fixed
+
+- `kite alerts delete` now goes through the kill-switch/confirmation gate when
+  any target is an `ato` alert (or couldn't be verified before deleting), the
+  same way `alerts enable`/`disable`, `orders cancel`, and `gtt delete` already
+  gate their own "only unwinds risk" actions. Previously it was the one
+  order-adjacent delete/cancel command left ungated regardless of alert type —
+  with the kill switch off, you could delete an order-arming alert outright
+  even though merely disabling the same alert was correctly refused.
 
 ### Removed
 

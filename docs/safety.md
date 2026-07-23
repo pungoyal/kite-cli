@@ -155,15 +155,26 @@ waving the alert through. A leg specification that cannot be parsed
 unambiguously is rejected outright — a silently mis-parsed leg would be a real
 order with the wrong parameters.
 
-`kite alerts enable`/`disable` go through the same `assertTradingEnabled` /
-confirmation gate as `modify` whenever the target is an ATO alert, since
-toggling it changes whether that basket can fire. Kite's alerts API does not
-document a `status` parameter or a dedicated toggle endpoint — the CLI sends
-the request anyway, but verifies with a fresh `GET` afterwards before reporting
-success — not the PUT response itself, since an undocumented field could be
-echoed straight back from the request without ever being persisted. If Kite
-silently ignores the field, the command exits non-zero instead of claiming the
-alert is disabled while it is still fully live.
+`kite alerts enable`/`disable`/`delete` all go through the same
+`assertTradingEnabled` / confirmation gate whenever a target is an ATO alert —
+`enable`/`disable` because toggling one changes whether its basket can fire,
+and `delete` because removing one cancels a live order-arming trigger, the
+same reasoning `orders cancel` and `gtt delete` already apply to their own
+"only unwinds risk" actions. `delete` treats an alert it could not verify as
+though it might be ATO rather than assuming simple, so an unreachable lookup
+fails closed onto the kill switch rather than skipping it. `enable`/`disable`
+do **not** re-check the value cap: the basket was already priced and capped at
+`create` time, and `enable` re-arms it as-is rather than re-quoting every leg —
+if `trading.maxOrderValue` was tightened since creation, `enable` can still
+re-arm a basket above the *current* cap.
+
+Kite's alerts API does not document a `status` parameter or a dedicated
+toggle endpoint — the CLI sends the request anyway, but verifies with a fresh
+`GET` afterwards before reporting success — not the PUT response itself,
+since an undocumented field could be echoed straight back from the request
+without ever being persisted. If Kite silently ignores the field, the command
+exits non-zero instead of claiming the alert is disabled while it is still
+fully live.
 
 ## Account identity in every preview
 
