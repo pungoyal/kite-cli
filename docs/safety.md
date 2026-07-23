@@ -155,6 +155,16 @@ waving the alert through. A leg specification that cannot be parsed
 unambiguously is rejected outright — a silently mis-parsed leg would be a real
 order with the wrong parameters.
 
+`kite alerts enable`/`disable` go through the same `assertTradingEnabled` /
+confirmation gate as `modify` whenever the target is an ATO alert, since
+toggling it changes whether that basket can fire. Kite's alerts API does not
+document a `status` parameter or a dedicated toggle endpoint — the CLI sends
+the request anyway, but verifies with a fresh `GET` afterwards before reporting
+success — not the PUT response itself, since an undocumented field could be
+echoed straight back from the request without ever being persisted. If Kite
+silently ignores the field, the command exits non-zero instead of claiming the
+alert is disabled while it is still fully live.
+
 ## Account identity in every preview
 
 Every confirmation and dry-run preview shows the **verified account** —
