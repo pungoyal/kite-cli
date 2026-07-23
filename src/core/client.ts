@@ -14,7 +14,6 @@ import { EnvelopeSchema, ErrorEnvelopeSchema } from './schemas.js';
  *  - Kite is form-encoded everywhere EXCEPT /margins/* and /charges/orders,
  *    which take JSON bodies. `json` vs `form` on RequestOptions selects.
  *  - `X-Kite-Version: 3` is mandatory on every request.
- *  - The sandbox serves all routes under an /oms prefix except /instruments.
  *  - GTT passes JSON-encoded strings *inside form fields*, not a JSON body.
  */
 
@@ -32,8 +31,6 @@ export interface RequestOptions<S extends z.ZodType> {
   json?: unknown;
   schema: S;
   signal?: AbortSignal | undefined;
-  /** Skip the /oms sandbox prefix. Only /instruments needs this. */
-  noPrefix?: boolean;
   /** Per-request timeout override, milliseconds. */
   timeoutMs?: number;
 }
@@ -134,9 +131,8 @@ export class KiteClient {
     return Boolean(this.accessToken);
   }
 
-  private buildUrl(path: string, query: RequestOptions<z.ZodType>['query'], noPrefix: boolean): URL {
-    const prefix = noPrefix ? '' : this.endpoints.routePrefix;
-    const url = new URL(`${this.endpoints.api}${prefix}${path}`);
+  private buildUrl(path: string, query: RequestOptions<z.ZodType>['query']): URL {
+    const url = new URL(`${this.endpoints.api}${path}`);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
         if (value === undefined) continue;
@@ -171,7 +167,7 @@ export class KiteClient {
     const category = opts.category ?? 'default';
     await this.limiter.acquire(category, opts.signal);
 
-    const url = this.buildUrl(opts.path, opts.query, opts.noPrefix ?? false);
+    const url = this.buildUrl(opts.path, opts.query);
 
     let body: string | undefined;
     const extraHeaders: Record<string, string> = {};
@@ -323,14 +319,9 @@ export class KiteClient {
    * Fetch a raw (non-JSON) body. Used only for the instrument dump, which is a
    * gzipped CSV rather than an API envelope.
    */
-  async requestText(opts: {
-    path: string;
-    signal?: AbortSignal | undefined;
-    noPrefix?: boolean;
-    timeoutMs?: number;
-  }): Promise<string> {
+  async requestText(opts: { path: string; signal?: AbortSignal | undefined; timeoutMs?: number }): Promise<string> {
     await this.limiter.acquire('default', opts.signal);
-    const url = this.buildUrl(opts.path, undefined, opts.noPrefix ?? false);
+    const url = this.buildUrl(opts.path, undefined);
 
     const timeout = AbortSignal.timeout(opts.timeoutMs ?? 120_000);
     const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;

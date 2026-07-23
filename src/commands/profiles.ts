@@ -1,6 +1,6 @@
 import { confirm, isCancel } from '@clack/prompts';
 import type { Context } from '../context.js';
-import { EnvironmentSchema, loadConfig, type ProfileConfig, saveConfig } from '../core/config.js';
+import { loadConfig, type ProfileConfig, saveConfig } from '../core/config.js';
 import { deleteAllSecrets } from '../core/credentials.js';
 import { AbortedError, ExitCode, KiteCliError, UsageError } from '../core/errors.js';
 import {
@@ -39,8 +39,6 @@ export const profileCommands: CommandFactory = (program, run) => {
     .description('Register a new account profile (does not log in)')
     .argument('<name>', 'A short label, e.g. personal or huf')
     .option('--api-key <key>', 'Kite Connect API key for this account')
-    // `--env` is a global option; it cannot be redeclared here without being
-    // shadowed by the root parser, so `addProfile` reads it from ctx.options.
     .option('--max-order-value <rupees>', 'Per-profile cap on any single order')
     .action(run(addProfile));
 
@@ -69,7 +67,6 @@ async function listProfiles(ctx: Context): Promise<void> {
       const meta = await loadSessionMeta(name);
       return {
         profile: name,
-        env: profile.env,
         api_key: Boolean(profile.apiKey),
         default: (config.defaultProfile ?? DEFAULT_PROFILE) === name,
         current: name === ctx.profile.name,
@@ -88,7 +85,6 @@ async function listProfiles(ctx: Context): Promise<void> {
     [
       { header: '', value: (r) => (r.current ? io.green('●') : ' ') },
       { header: 'Profile', value: (r) => (r.current ? io.bold(r.profile) : r.profile) },
-      { header: 'Env', value: (r) => (r.env === 'sandbox' ? io.cyan(r.env) : r.env) },
       { header: 'API key', value: (r) => (r.api_key ? io.green('set') : io.dim('—')) },
       { header: 'Default', value: (r) => (r.default ? '✓' : ' ') },
       { header: 'Session', value: (r) => r.session },
@@ -125,15 +121,6 @@ async function addProfile(
 
   const entry: ProfileConfig = {};
   if (opts.apiKey) entry.apiKey = opts.apiKey;
-  // The global `--env` lands in ctx.options (see the command definition). It was
-  // already validated by profile resolution, so re-check defensively only.
-  if (ctx.options.env) {
-    const parsed = EnvironmentSchema.safeParse(ctx.options.env);
-    if (!parsed.success) {
-      throw new UsageError(`Unknown environment "${ctx.options.env}". Expected "production" or "sandbox".`);
-    }
-    entry.env = parsed.data;
-  }
   if (opts.maxOrderValue !== undefined) {
     const cap = Number(opts.maxOrderValue);
     if (!Number.isFinite(cap) || cap <= 0) throw new UsageError(`--max-order-value must be a positive number.`);
@@ -224,7 +211,6 @@ async function currentProfile(ctx: Context): Promise<void> {
   if (io.json) {
     io.writeJson({
       profile: profile.name,
-      env: profile.env,
       logged_in: ctx.client.hasSession(),
       user_id: meta?.userId ?? null,
     });
@@ -234,7 +220,6 @@ async function currentProfile(ctx: Context): Promise<void> {
   io.line(
     renderKeyValue(io, [
       ['Profile', profile.name === DEFAULT_PROFILE ? profile.name : io.bold(profile.name)],
-      ['Environment', profile.env === 'sandbox' ? io.cyan('sandbox') : 'production'],
       ['API key', profile.apiKey ? io.green('set') : io.dim('not set')],
       [
         'Session',

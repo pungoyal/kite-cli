@@ -186,11 +186,9 @@ export class InstrumentStore {
   private loaded = false;
 
   private readonly api: KiteApi;
-  private readonly env: string;
 
-  constructor(api: KiteApi, env: string) {
+  constructor(api: KiteApi) {
     this.api = api;
-    this.env = env;
   }
 
   /** Load from cache, fetching from Kite if absent or stale. */
@@ -230,7 +228,7 @@ export class InstrumentStore {
 
   private async readCache(): Promise<InstrumentCache | null> {
     try {
-      const raw = await readFile(instrumentsCacheFile(this.env), 'utf8');
+      const raw = await readFile(instrumentsCacheFile(), 'utf8');
       const parsed = JSON.parse(raw) as InstrumentCache;
       if (!Array.isArray(parsed.instruments)) return null;
       return parsed;
@@ -241,7 +239,7 @@ export class InstrumentStore {
 
   private async writeCache(cache: InstrumentCache): Promise<void> {
     await ensurePrivateDir(cacheDir());
-    await writeFile(instrumentsCacheFile(this.env), JSON.stringify(cache), 'utf8');
+    await writeFile(instrumentsCacheFile(), JSON.stringify(cache), 'utf8');
   }
 
   get size(): number {

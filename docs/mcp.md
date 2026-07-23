@@ -52,27 +52,14 @@ that reads a JSON config (such as Claude Desktop):
   "mcpServers": {
     "kite": {
       "command": "kite",
-      "args": ["mcp", "--env", "sandbox"]
-    }
-  }
-}
-```
-
-**Try the sandbox first.** With `--env sandbox` the agent talks to Zerodha's public
-sandbox — fake money, no subscription — so you can see exactly what it reads before
-connecting it to your real account. Drop the `"--env", "sandbox"` arguments to run
-against production (still read-only):
-
-```json
-{
-  "mcpServers": {
-    "kite": {
-      "command": "kite",
       "args": ["mcp"]
     }
   }
 }
 ```
+
+Every tool the server exposes is read-only (see the table above), so pointing
+an agent at it never risks placing an order.
 
 If `kite` isn't on the `PATH` your client sees, use an absolute path (the output of
 `which kite`) as `command`.
@@ -82,8 +69,7 @@ If `kite` isn't on the `PATH` your client sees, use an absolute path (the output
 The server needs a live session — every tool calls the API. Log in first:
 
 ```bash
-kite login                 # production
-kite login --env sandbox   # sandbox
+kite login
 ```
 
 Starting the server without a session exits with code `3` and a message telling you

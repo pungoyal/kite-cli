@@ -49,8 +49,8 @@ export function credentialsFile(): string {
 }
 
 /** Instrument master cache, refreshed daily. */
-export function instrumentsCacheFile(env: string): string {
-  return join(cacheDir(), `instruments.${env}.json`);
+export function instrumentsCacheFile(): string {
+  return join(cacheDir(), 'instruments.json');
 }
 
 /** Create a directory with 0700 so secrets are not world-readable. */

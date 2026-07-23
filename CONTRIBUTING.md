@@ -26,16 +26,16 @@ files — it never rewrites them mid-commit.
 Run the CLI straight from TypeScript source, no build step:
 
 ```bash
+npm run dev -- login
 npm run dev -- holdings
 npm run dev -- orders place NSE:INFY -s BUY -q 1 --dry-run
 ```
 
-Work against Zerodha's public sandbox so you never risk real money:
-
-```bash
-npm run dev -- login --env sandbox
-npm run dev -- --env sandbox holdings
-```
+There is no sandbox environment — Zerodha's own Kite Connect sandbox is
+undocumented beyond a login form, so this CLI does not integrate with it (see
+`CHANGELOG.md`). For anything that would place, modify, or cancel an order,
+always add `--dry-run` while developing. Most tests run in-process against a
+mocked transport (see `test/setup.ts`) and need no live session at all.
 
 ## Checks
 

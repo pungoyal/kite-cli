@@ -34,9 +34,9 @@ It places real orders with real money, under an unofficial banner — so the saf
 is built into the architecture, and every claim below is verifiable rather than
 aspirational:
 
-- **Try it risk-free first.** Zerodha runs a public sandbox with fake money and no
-  subscription. `kite login --env sandbox` gives you a full session to rehearse
-  every command against before you ever point it at your own account.
+- **Try it risk-free first.** Every order command supports `--dry-run`, which
+  resolves and previews the order — the actual contract, lot size and computed
+  value — without sending anything to Kite.
 - **It never silently moves money.** Every order previews the *resolved* order —
   the actual contract, lot size and computed value, not an echo of your flags —
   and waits for confirmation. There is deliberately no config key that turns that
@@ -84,21 +84,8 @@ Requires **Node 22.12 or newer**.
 
 ## Getting started
 
-**Kick the tyres first — no account, no subscription, no risk.** Zerodha runs a
-public sandbox with fake money, and every command behaves exactly as it does
-against a real account:
-
-```bash
-kite login --env sandbox
-kite --env sandbox holdings
-kite --env sandbox orders place NSE:INFY --side BUY --quantity 1 --dry-run
-```
-
-Learn the commands and see the confirmations there before any real money is
-involved.
-
-**Then connect your own account.** You need a [Kite Connect](https://developers.kite.trade)
-app to get an API key and secret. Set your app's redirect URL to:
+You need a [Kite Connect](https://developers.kite.trade) app to get an API
+key and secret. Set your app's redirect URL to:
 
 ```
 http://127.0.0.1:51101/callback
@@ -308,20 +295,19 @@ your profile, holdings, positions, funds, orders, trades, quotes and instruments
 it **cannot** place, modify or cancel anything. Trading stays at a
 human-confirmed terminal, by design.
 
-Point an MCP client at it — try the sandbox first:
+Point an MCP client at it:
 
 ```json
 {
   "mcpServers": {
     "kite": {
       "command": "kite",
-      "args": ["mcp", "--env", "sandbox"]
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-Drop the `--env sandbox` args to run against your real account (still read-only).
 The server needs a live session, so `kite login` first.
 
 ## Multiple accounts
@@ -340,9 +326,8 @@ kite profiles use huf                 # make it the default for commands without
 ```
 
 `profiles add` can take the account's settings up front so `login` doesn't have to
-prompt for them: `--api-key <key>`, `--env sandbox` (the profile's environment,
-default `production`), and `--max-order-value <rupees>` (a per-profile cap). The API
-secret is never a flag — `login` always prompts for it.
+prompt for them: `--api-key <key>` and `--max-order-value <rupees>` (a per-profile
+cap). The API secret is never a flag — `login` always prompts for it.
 
 Selection is resolved fresh every run — there is no hidden "active account" that
 persists silently between commands. The target is chosen by, in order:
@@ -352,8 +337,7 @@ persists silently between commands. The target is chosen by, in order:
 3. the default set with `kite profiles use`
 4. otherwise the `default` profile
 
-`default` is your original single-account setup (nothing to migrate), and `sandbox`
-is a reserved profile — `--env sandbox` is just shorthand for `--profile sandbox`.
+`default` is your original single-account setup — nothing to migrate.
 
 Because targeting the wrong account is the costly mistake here, every money-moving
 confirmation shows the **verified account** it will hit — the user id returned by
@@ -501,12 +485,12 @@ The same pages are browsable as Markdown in [`docs/`](https://github.com/pungoya
 The client is exported if you want it without the CLI:
 
 ```ts
-import { KiteClient, KiteApi, endpointsFor } from '@pungoyal/kite-cli';
+import { ENDPOINTS, KiteClient, KiteApi } from '@pungoyal/kite-cli';
 
 const client = new KiteClient({
   apiKey: process.env.KITE_API_KEY!,
   accessToken: process.env.KITE_ACCESS_TOKEN!,
-  endpoints: endpointsFor('production'),
+  endpoints: ENDPOINTS,
 });
 
 const api = new KiteApi(client);
@@ -533,7 +517,7 @@ Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](https:/
 
 This is an unofficial, independent, community project. It is **not affiliated with, endorsed by, or sponsored by Zerodha**. "Kite", "Kite Connect", and "Zerodha" are trademarks of Zerodha Broking Ltd.; this project references them only to identify the third-party API it interoperates with (nominative use) and claims no rights to those marks.
 
-Trading involves risk of financial loss. This software is provided as-is under the MIT licence — you are responsible for every order it places on your behalf. Test with `--env sandbox` and `--dry-run` before trusting it with real money.
+Trading involves risk of financial loss. This software is provided as-is under the MIT licence — you are responsible for every order it places on your behalf. Test with `--dry-run` before trusting it with real money.
 
 ## Licence
 

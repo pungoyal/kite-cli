@@ -2,7 +2,7 @@ import { MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KiteApi } from '../src/core/api.js';
 import { KiteClient, setDispatcher } from '../src/core/client.js';
-import { endpointsFor } from '../src/core/config.js';
+import { ENDPOINTS } from '../src/core/config.js';
 import { ExitCode, KiteApiError } from '../src/core/errors.js';
 import { RateLimiter } from '../src/core/ratelimit.js';
 
@@ -32,7 +32,7 @@ function makeClient(accessToken = 'testtoken') {
   return new KiteClient({
     apiKey: 'testkey',
     accessToken,
-    endpoints: endpointsFor('production'),
+    endpoints: ENDPOINTS,
     limiter: new RateLimiter(),
   });
 }
@@ -70,7 +70,7 @@ describe('request signing', () => {
 
     const client = new KiteClient({
       apiKey: 'testkey',
-      endpoints: endpointsFor('production'),
+      endpoints: ENDPOINTS,
       limiter: new RateLimiter(),
     });
     const profile = await new KiteApi(client).getProfile();
@@ -379,56 +379,6 @@ describe('order reconciliation', () => {
     const matches = await new KiteApi(makeClient()).findOrderByTag('kcabc123');
     expect(matches).toHaveLength(1);
     expect(matches[0]!.order_id).toBe('111');
-  });
-});
-
-describe('sandbox routing', () => {
-  it('prefixes API routes with /oms', async () => {
-    const sandboxAgent = new MockAgent();
-    sandboxAgent.disableNetConnect();
-    setDispatcher(sandboxAgent);
-
-    let called = false;
-    sandboxAgent
-      .get('https://sandbox.kite.trade')
-      .intercept({ path: '/oms/user/profile', method: 'GET' })
-      .reply(200, () => {
-        called = true;
-        return { status: 'success', data: { user_id: 'SB1234' } };
-      });
-
-    const client = new KiteClient({
-      apiKey: 'sandboxdemo',
-      accessToken: 'tok',
-      endpoints: endpointsFor('sandbox'),
-      limiter: new RateLimiter(),
-    });
-    await new KiteApi(client).getProfile();
-
-    expect(called).toBe(true);
-    await sandboxAgent.close();
-  });
-
-  it('does NOT prefix /instruments, which the sandbox serves unprefixed', async () => {
-    const sandboxAgent = new MockAgent();
-    sandboxAgent.disableNetConnect();
-    setDispatcher(sandboxAgent);
-
-    sandboxAgent
-      .get('https://sandbox.kite.trade')
-      .intercept({ path: '/instruments', method: 'GET' })
-      .reply(200, 'instrument_token,tradingsymbol,exchange\n1,INFY,NSE\n');
-
-    const client = new KiteClient({
-      apiKey: 'sandboxdemo',
-      accessToken: 'tok',
-      endpoints: endpointsFor('sandbox'),
-      limiter: new RateLimiter(),
-    });
-    const csv = await new KiteApi(client).getInstrumentsCsv();
-
-    expect(csv).toContain('INFY');
-    await sandboxAgent.close();
   });
 });
 

@@ -12,9 +12,6 @@ import { configDir, configFile, ensurePrivateDir } from './paths.js';
  * is exactly how an accidental order gets placed.
  */
 
-export const EnvironmentSchema = z.enum(['production', 'sandbox']);
-export type Environment = z.infer<typeof EnvironmentSchema>;
-
 export const TradingSchema = z.object({
   /**
    * Local kill switch. When false, every order-placing, order-modifying and
@@ -53,12 +50,11 @@ export type ProfileTradingOverrides = z.infer<typeof ProfileTradingSchema>;
 
 /**
  * A named account. Each real Zerodha account has its own Kite Connect app, so a
- * profile carries its own (semi-public) api key and env; its api secret and
- * access token live in the keyring / encrypted file, namespaced by profile.
+ * profile carries its own (semi-public) api key; its api secret and access
+ * token live in the keyring / encrypted file, namespaced by profile.
  */
 export const ProfileConfigSchema = z.object({
   apiKey: z.string().min(1).optional(),
-  env: EnvironmentSchema.optional(),
   trading: ProfileTradingSchema.optional(),
 });
 export type ProfileConfig = z.infer<typeof ProfileConfigSchema>;
@@ -67,19 +63,17 @@ export const ConfigSchema = z.object({
   /** Kite Connect API key. Semi-public (it appears in login URLs), so not a keyring secret. */
   apiKey: z.string().min(1).optional(),
 
-  env: EnvironmentSchema.default('production'),
-
   trading: TradingSchema.prefault({}),
 
   /**
    * The profile used when none is named on the command line or in KITE_PROFILE.
-   * Absent means the reserved `default` profile (top-level apiKey/env above).
+   * Absent means the reserved `default` profile (top-level apiKey above).
    */
   defaultProfile: z.string().min(1).optional(),
 
   /**
-   * Named accounts beyond `default`. The `default` and `sandbox` profiles are
-   * reserved and synthesised, so they never need an entry here.
+   * Named accounts beyond `default`. The `default` profile is reserved and
+   * synthesised, so it never needs an entry here.
    */
   profiles: z.record(z.string(), ProfileConfigSchema).default({}),
 
@@ -158,7 +152,6 @@ export async function saveConfig(config: Config): Promise<void> {
  */
 export const SETTABLE_KEYS = {
   apiKey: { type: 'string', description: 'Kite Connect API key' },
-  env: { type: 'string', description: 'production or sandbox' },
   'trading.enabled': {
     type: 'boolean',
     description: 'Master kill switch for all order commands',
@@ -196,47 +189,15 @@ export function isSettableKey(key: string): key is SettableKey {
   return Object.hasOwn(SETTABLE_KEYS, key);
 }
 
-/** Environment-specific API endpoints. */
+/** Kite Connect API endpoints. */
 export interface Endpoints {
   api: string;
   ws: string;
   login: string;
-  /**
-   * Sandbox serves every route under an /oms prefix — except /instruments.
-   * Production has no prefix.
-   */
-  routePrefix: string;
 }
 
-export function endpointsFor(env: Environment): Endpoints {
-  if (env === 'sandbox') {
-    return {
-      api: 'https://sandbox.kite.trade',
-      ws: 'wss://ws-sandbox.kite.trade',
-      login: 'https://sandbox.kite.trade/connect/login',
-      routePrefix: '/oms',
-    };
-  }
-  return {
-    api: 'https://api.kite.trade',
-    ws: 'wss://ws.kite.trade',
-    login: 'https://kite.zerodha.com/connect/login',
-    routePrefix: '',
-  };
-}
-
-/** Public sandbox credentials, documented at https://kite.trade/docs/connect/v3/sandbox/ */
-export const SANDBOX_CREDENTIALS = {
-  apiKey: 'sandboxdemo',
-  apiSecret: 'sandboxdemo-secret',
-} as const;
-
-/** Resolve the effective environment: --env flag > KITE_ENV > config > production. */
-export function resolveEnv(flag: string | undefined, config: Config): Environment {
-  const candidate = flag ?? process.env['KITE_ENV'] ?? config.env;
-  const result = EnvironmentSchema.safeParse(candidate);
-  if (!result.success) {
-    throw new KiteCliError(`Unknown environment "${candidate}". Expected "production" or "sandbox".`, ExitCode.Usage);
-  }
-  return result.data;
-}
+export const ENDPOINTS: Endpoints = {
+  api: 'https://api.kite.trade',
+  ws: 'wss://ws.kite.trade',
+  login: 'https://kite.zerodha.com/connect/login',
+};

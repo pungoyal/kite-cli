@@ -25,7 +25,6 @@ export function applyGlobalOptions(program: Command): Command {
       // order and GTT subcommands, which is typed far more often than --quiet.
       .option('--quiet', 'Suppress informational messages')
       .option('--debug', 'Print redacted request diagnostics to stderr')
-      .option('--env <env>', 'Environment: production or sandbox')
       .option('--profile <name>', 'Account profile to use (see `kite profiles`)')
       .option('-y, --yes', 'Skip confirmation prompts (use with care)')
       .option('--dry-run', 'Show what would happen without sending anything to Kite')

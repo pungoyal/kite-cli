@@ -161,10 +161,6 @@ async function placeGtt(
   ctx.requireSession();
   assertTradingEnabled(ctx);
 
-  if (ctx.env === 'sandbox') {
-    throw new KiteCliError('The sandbox does not support GTT.', ExitCode.Input);
-  }
-
   const instrumentArg = command.args[0];
   if (!instrumentArg) throw new UsageError('An instrument is required.');
   const instrument = parseInstrumentKey(instrumentArg);

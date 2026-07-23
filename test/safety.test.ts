@@ -766,15 +766,6 @@ describe('multi-account safety', () => {
   });
 });
 
-describe('sandbox guard rails', () => {
-  it('rejects MARKET orders, which the sandbox does not accept', async () => {
-    await seedSession({ env: 'sandbox' });
-    const code = await invoke(['--env', 'sandbox', 'orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1', '--yes']);
-    expect(code).toBe(ExitCode.Usage);
-    expect(err).toMatch(/sandbox does not accept MARKET/i);
-  });
-});
-
 describe('alerts safety', () => {
   const pool = () => agent.get('https://api.kite.trade');
 

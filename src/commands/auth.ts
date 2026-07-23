@@ -9,10 +9,10 @@ import {
   redirectUrlFor,
   waitForCallback,
 } from '../core/auth.js';
-import { type Environment, loadConfig, SANDBOX_CREDENTIALS, saveConfig } from '../core/config.js';
+import { loadConfig, saveConfig } from '../core/config.js';
 import { deleteAllSecrets, getSecret, keyringAvailable, setSecret } from '../core/credentials.js';
 import { AbortedError, ExitCode, KiteCliError } from '../core/errors.js';
-import { getProfile, listProfileNames } from '../core/profiles.js';
+import { listProfileNames } from '../core/profiles.js';
 import { maskSecret, registerSecret } from '../core/redact.js';
 import {
   clearSessionMeta,
@@ -61,33 +61,26 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
     return;
   }
 
-  const isSandbox = ctx.env === 'sandbox';
-  if (profileName !== 'default' && !isSandbox) {
+  if (profileName !== 'default') {
     io.info(`Logging in to profile ${io.bold(profileName)}.`);
   }
 
   // --- credentials -------------------------------------------------------
-  let apiKey = opts.apiKey ?? (isSandbox ? SANDBOX_CREDENTIALS.apiKey : ctx.profile.apiKey);
+  let apiKey = opts.apiKey ?? ctx.profile.apiKey;
   let apiSecret: string;
 
-  if (isSandbox) {
-    apiKey = SANDBOX_CREDENTIALS.apiKey;
-    apiSecret = SANDBOX_CREDENTIALS.apiSecret;
-    io.info('Using the public sandbox credentials. No real money is involved.');
-  } else {
-    if (!apiKey) {
-      apiKey = await promptText('Kite Connect API key', 'Create an app at https://developers.kite.trade to get one.');
-    }
+  if (!apiKey) {
+    apiKey = await promptText('Kite Connect API key', 'Create an app at https://developers.kite.trade to get one.');
+  }
 
-    const stored = await getSecret('api_secret', { scope: ctx.credentialScope });
-    if (stored && !opts.force) {
-      apiSecret = stored.value;
-      io.info(`Using stored API secret (${maskSecret(apiSecret)}) from the ${stored.backend}.`);
-    } else {
-      // Prompted, never accepted as a CLI argument: argv is visible to any
-      // local process via `ps`, and lands in shell history.
-      apiSecret = await promptSecret('Kite Connect API secret');
-    }
+  const stored = await getSecret('api_secret', { scope: ctx.credentialScope });
+  if (stored && !opts.force) {
+    apiSecret = stored.value;
+    io.info(`Using stored API secret (${maskSecret(apiSecret)}) from the ${stored.backend}.`);
+  } else {
+    // Prompted, never accepted as a CLI argument: argv is visible to any
+    // local process via `ps`, and lands in shell history.
+    apiSecret = await promptSecret('Kite Connect API secret');
   }
 
   registerSecret(apiSecret);
@@ -127,16 +120,13 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
   const backend = await setSecret('access_token', session.access_token, {
     scope: ctx.credentialScope,
   });
-  if (!isSandbox) {
-    await setSecret('api_secret', apiSecret, { scope: ctx.credentialScope });
-  }
+  await setSecret('api_secret', apiSecret, { scope: ctx.credentialScope });
 
   const expiresAt = nextTokenExpiry();
   await saveSessionMeta({
     userId: session.user_id,
     userName: session.user_name,
     broker: session.broker,
-    env: ctx.env,
     apiKey,
     profile: profileName,
     expiresAt: expiresAt.toISOString(),
@@ -146,17 +136,13 @@ async function login(ctx: Context, opts: { manual?: boolean; apiKey?: string; fo
   });
 
   // Register the profile's api key so subsequent runs find it, and so a new
-  // named profile becomes discoverable in `kite profiles`. The sandbox uses the
-  // public constant, so there is nothing worth persisting for it.
-  if (!isSandbox) {
-    await persistProfileApiKey(profileName, ctx.env, apiKey);
-  }
+  // named profile becomes discoverable in `kite profiles`.
+  await persistProfileApiKey(profileName, apiKey);
 
   if (io.json) {
     io.writeJson({
       user_id: session.user_id,
       user_name: session.user_name,
-      env: ctx.env,
       profile: profileName,
       expires_at: expiresAt.toISOString(),
       storage: backend,
@@ -366,7 +352,6 @@ async function whoami(ctx: Context, opts: { all?: boolean }): Promise<void> {
   if (io.json) {
     io.writeJson({
       logged_in: true,
-      env: ctx.env,
       profile: profileName,
       expires_at: meta?.expiresAt,
       account,
@@ -380,7 +365,6 @@ async function whoami(ctx: Context, opts: { all?: boolean }): Promise<void> {
       ['User', `${account.user_name ?? '—'} (${account.user_id})`],
       ['Email', account.email ?? '—'],
       ['Broker', account.broker ?? '—'],
-      ['Environment', ctx.env === 'sandbox' ? io.cyan('sandbox') : 'production'],
       ['Exchanges', account.exchanges.join(', ') || '—'],
       ['Products', account.products.join(', ') || '—'],
       [
@@ -406,7 +390,6 @@ async function whoamiAll(ctx: Context): Promise<void> {
           : `expires in ${timeUntilExpiry(meta)}`;
       return {
         profile: name,
-        env: getProfile(config, name).env,
         user: meta?.userName ?? meta?.userId ?? '—',
         session: status,
         current: name === ctx.profile.name,
@@ -420,7 +403,6 @@ async function whoamiAll(ctx: Context): Promise<void> {
     [
       { header: '', value: (r) => (r.current ? io.green('●') : ' ') },
       { header: 'Profile', value: (r) => (r.current ? io.bold(r.profile) : r.profile) },
-      { header: 'Env', value: (r) => (r.env === 'sandbox' ? io.cyan(r.env) : r.env) },
       { header: 'User', value: (r) => r.user },
       { header: 'Session', value: (r) => r.session },
     ],
@@ -435,7 +417,7 @@ async function whoamiAll(ctx: Context): Promise<void> {
  * `kite profiles`. Reads the raw config fresh so the in-memory effective
  * trading overlay is never written back.
  */
-async function persistProfileApiKey(profileName: string, env: Environment, apiKey: string): Promise<void> {
+async function persistProfileApiKey(profileName: string, apiKey: string): Promise<void> {
   const config = await loadConfig();
   if (profileName === 'default') {
     if (config.apiKey === apiKey) return;
@@ -443,10 +425,10 @@ async function persistProfileApiKey(profileName: string, env: Environment, apiKe
     return;
   }
   const existing = config.profiles[profileName];
-  if (existing?.apiKey === apiKey && existing?.env === env) return;
+  if (existing?.apiKey === apiKey) return;
   await saveConfig({
     ...config,
-    profiles: { ...config.profiles, [profileName]: { ...existing, apiKey, env } },
+    profiles: { ...config.profiles, [profileName]: { ...existing, apiKey } },
   });
 }
 

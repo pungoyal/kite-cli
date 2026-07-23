@@ -13,14 +13,14 @@ import { clearSessionMeta, loadSessionMeta, type SessionMeta, saveSessionMeta } 
  * Context assembly, exercised through the real `createContext` seam.
  *
  * `createContext` makes no network call — it only reads local config, session
- * metadata and stored secrets — so these run against the sandboxed temp config
+ * metadata and stored secrets — so these run against an isolated temp config
  * dir with no HTTP mock. What they lock down is the safety-critical part of
  * account resolution: which stored token is trusted for which account, and the
  * fail-closed guard against an ambient token standing in for a named profile.
  *
  * Two seeding modes must never be mixed in one test (see each block):
  *   - stored-file: `setSecret(..., { scope })` with KITE_CREDENTIALS_PASSPHRASE
- *     and NO ambient token, so resolution reaches the env/apiKey/expiry checks.
+ *     and NO ambient token, so resolution reaches the apiKey/expiry checks.
  *   - ambient-env: KITE_ACCESS_TOKEN set, which short-circuits those checks and
  *     is only correct for the CI escape-hatch and the conflict-guard cases.
  */
@@ -53,7 +53,6 @@ async function seedConfig(over: Partial<Config> = {}): Promise<void> {
 async function seedSession(meta: Partial<SessionMeta> & Pick<SessionMeta, 'profile'>): Promise<void> {
   await saveSessionMeta({
     userId: 'AB1234',
-    env: 'production',
     apiKey: 'legacykey',
     expiresAt: FUTURE(),
     exchanges: [],
@@ -66,7 +65,6 @@ beforeEach(async () => {
   await rm(configDir(), { recursive: true, force: true });
   // A developer shell must not leak selection state into resolution.
   delete process.env['KITE_PROFILE'];
-  delete process.env['KITE_ENV'];
   // The encrypted-file backend (keyring is disabled globally in setup.ts).
   process.env['KITE_CREDENTIALS_PASSPHRASE'] = PASSPHRASE;
 });
@@ -80,8 +78,8 @@ describe('trusting a stored access token (cross-account safety)', () => {
   // install — top-level apiKey, session.json, an unprefixed stored token —
   // resolves to `default` and authenticates with zero migration.
   it('authenticates a legacy default install unchanged', async () => {
-    await seedConfig({ apiKey: 'legacykey', env: 'production' });
-    await seedSession({ profile: 'default', apiKey: 'legacykey', env: 'production' });
+    await seedConfig({ apiKey: 'legacykey' });
+    await seedSession({ profile: 'default', apiKey: 'legacykey' });
     await setSecret('access_token', 'legacy-token', { scope: '' });
 
     const ctx = await context();
@@ -91,27 +89,18 @@ describe('trusting a stored access token (cross-account safety)', () => {
     expect(ctx.client.hasSession()).toBe(true);
   });
 
-  it('drops a token whose session belongs to a different environment', async () => {
-    // Sending a sandbox token to production 403s; treat it as absent instead.
-    await seedConfig({ apiKey: 'legacykey', env: 'production' });
-    await seedSession({ profile: 'default', apiKey: 'legacykey', env: 'sandbox' });
-    await setSecret('access_token', 'wrong-env-token', { scope: '' });
-
-    expect((await context()).client.hasSession()).toBe(false);
-  });
-
   it('drops a token whose session was issued for a different API key', async () => {
     // The app was re-keyed; the old token cannot be valid under the new key.
-    await seedConfig({ apiKey: 'newkey', env: 'production' });
-    await seedSession({ profile: 'default', apiKey: 'oldkey', env: 'production' });
+    await seedConfig({ apiKey: 'newkey' });
+    await seedSession({ profile: 'default', apiKey: 'oldkey' });
     await setSecret('access_token', 'stale-key-token', { scope: '' });
 
     expect((await context()).client.hasSession()).toBe(false);
   });
 
   it('drops a token whose local expiry has already passed', async () => {
-    await seedConfig({ apiKey: 'legacykey', env: 'production' });
-    await seedSession({ profile: 'default', apiKey: 'legacykey', env: 'production', expiresAt: PAST() });
+    await seedConfig({ apiKey: 'legacykey' });
+    await seedSession({ profile: 'default', apiKey: 'legacykey', expiresAt: PAST() });
     await setSecret('access_token', 'expired-token', { scope: '' });
 
     expect((await context()).client.hasSession()).toBe(false);
@@ -122,9 +111,9 @@ describe('per-profile credential isolation', () => {
   // The core reason profiles exist: two accounts logged in at once, each seeing
   // only its own token.
   it('reads a named profile token from its own namespace, and the default cannot see it', async () => {
-    await seedConfig({ profiles: { spouse: { apiKey: 'spousekey', env: 'production' } } });
-    await seedSession({ profile: 'spouse', apiKey: 'spousekey', env: 'production' });
-    const spouseScope = storagePrefixFor({ name: 'spouse', env: 'production' });
+    await seedConfig({ profiles: { spouse: { apiKey: 'spousekey' } } });
+    await seedSession({ profile: 'spouse', apiKey: 'spousekey' });
+    const spouseScope = storagePrefixFor({ name: 'spouse' });
     await setSecret('access_token', 'spouse-token', { scope: spouseScope });
 
     const spouse = await context({ profile: 'spouse' });
@@ -195,14 +184,16 @@ describe('resilience', () => {
 });
 
 describe('requireApiSecret', () => {
-  it('returns the public sandbox secret without touching storage', async () => {
-    const ctx = await context({ env: 'sandbox' });
-    expect(ctx.env).toBe('sandbox');
-    await expect(ctx.requireApiSecret()).resolves.toBe('sandboxdemo-secret');
+  it('returns the stored secret', async () => {
+    await seedConfig({ apiKey: 'legacykey' });
+    await setSecret('api_secret', 'stored-secret', { scope: '' });
+
+    const ctx = await context();
+    await expect(ctx.requireApiSecret()).resolves.toBe('stored-secret');
   });
 
   it('fails with the auth exit code when no secret is stored', async () => {
-    await seedConfig({ apiKey: 'legacykey', env: 'production' });
+    await seedConfig({ apiKey: 'legacykey' });
     const ctx = await context();
 
     const err = await ctx.requireApiSecret().catch((e) => e);

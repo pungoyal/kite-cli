@@ -18,11 +18,10 @@ cannot detect this proactively — it only shows up as a `403`/`TokenException`
 on the next request. If `whoami` was working minutes ago and now fails,
 this is more likely than expiry.
 
-**Or: a stored token belongs to a different environment or API key.** If
-you've switched `--env` or rotated your Kite Connect app's key, a session
-saved under the old combination is treated as absent (rather than sent and
-getting a confusing `403`) — just `kite login` again for the new
-combination.
+**Or: a stored token belongs to a different API key.** If you've rotated
+your Kite Connect app's key, a session saved under the old key is treated
+as absent (rather than sent and getting a confusing `403`) — just
+`kite login` again for the new key.
 
 ## Historical data returns 403
 
@@ -87,7 +86,7 @@ for the full precedence order.
 Check which profile actually resolved. Selection has no persistent "active
 account" — it's recomputed every invocation from `--profile` /
 `KITE_PROFILE` / the configured default, in that order (see
-[configuration.md](configuration.md#profile-and-environment-resolution)).
+[configuration.md](configuration.md#profile-resolution)).
 Run `kite whoami --all` to see every profile's session status, and always
 check the **Account** line on a confirmation/dry-run preview before
 approving — it shows the verified `user_id` Kite returned, not just the

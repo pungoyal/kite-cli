@@ -1,13 +1,6 @@
 import { KiteApi } from './core/api.js';
 import { KiteClient } from './core/client.js';
-import {
-  type Config,
-  type Endpoints,
-  type Environment,
-  endpointsFor,
-  loadConfig,
-  SANDBOX_CREDENTIALS,
-} from './core/config.js';
+import { type Config, ENDPOINTS, type Endpoints, loadConfig } from './core/config.js';
 import { getSecret } from './core/credentials.js';
 import { AuthRequiredError, ExitCode, KiteCliError } from './core/errors.js';
 import { InstrumentStore } from './core/instruments.js';
@@ -31,7 +24,6 @@ export interface GlobalOptions {
   color?: 'auto' | 'always' | 'never';
   quiet?: boolean;
   debug?: boolean;
-  env?: string;
   profile?: string;
   yes?: boolean;
   dryRun?: boolean;
@@ -40,7 +32,6 @@ export interface GlobalOptions {
 export interface Context {
   io: Io;
   config: Config;
-  env: Environment;
   /** The account this invocation targets. */
   profile: ResolvedProfile;
   /** Keyring / file namespace prefix for this profile's secrets. */
@@ -64,9 +55,8 @@ export async function createContext(
   streams?: IoStreams,
 ): Promise<Context> {
   const loaded = await loadConfig();
-  const profile = resolveProfile({ profileFlag: options.profile, envFlag: options.env }, loaded);
-  const env = profile.env;
-  const endpoints = endpointsFor(env);
+  const profile = resolveProfile({ profileFlag: options.profile }, loaded);
+  const endpoints = ENDPOINTS;
   const credentialScope = storagePrefixFor(profile);
 
   // The trading config actually in force: global settings overlaid with this
@@ -99,7 +89,7 @@ export async function createContext(
   const apiKey = resolveApiKey(profile);
 
   const session = await loadSessionMeta(profile.name);
-  const accessToken = await resolveAccessToken(env, session, apiKey, io, credentialScope);
+  const accessToken = await resolveAccessToken(session, apiKey, io, credentialScope);
 
   const client = new KiteClient({
     apiKey,
@@ -111,7 +101,7 @@ export async function createContext(
   });
 
   const api = new KiteApi(client);
-  const instruments = new InstrumentStore(api, env);
+  const instruments = new InstrumentStore(api);
 
   const requireSession = (): SessionMeta => {
     if (!client.hasSession()) {
@@ -121,17 +111,13 @@ export async function createContext(
           `Run \`kite --profile ${profile.name} login\`.`,
         );
       }
-      throw new AuthRequiredError(
-        env === 'sandbox' ? 'No sandbox session.' : 'Not logged in.',
-        env === 'sandbox' ? 'Run `kite login --env sandbox`.' : 'Run `kite login` to start a session.',
-      );
+      throw new AuthRequiredError('Not logged in.', 'Run `kite login` to start a session.');
     }
     // A session file is absent when credentials came from the environment,
     // which is the normal CI path — synthesise a minimal record.
     if (!session) {
       return {
         userId: 'unknown',
-        env,
         apiKey,
         profile: profile.name,
         expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
@@ -143,7 +129,6 @@ export async function createContext(
   };
 
   const requireApiSecret = async (): Promise<string> => {
-    if (env === 'sandbox') return SANDBOX_CREDENTIALS.apiSecret;
     const found = await getSecret('api_secret', { scope: credentialScope });
     if (!found) {
       throw new KiteCliError(
@@ -158,7 +143,6 @@ export async function createContext(
   return {
     io,
     config,
-    env,
     profile,
     credentialScope,
     endpoints,
@@ -176,15 +160,14 @@ export async function createContext(
 function resolveApiKey(profile: ResolvedProfile): string {
   const fromEnv = process.env['KITE_API_KEY'];
   if (fromEnv && fromEnv.trim() !== '') return fromEnv;
-  // The profile already carries the right key: the sandbox constant, the
-  // default profile's config.apiKey, or a named profile's stored key. Empty is
-  // fine and non-fatal — `kite login` sets it up, and `kite config` must work
-  // before it exists.
+  // The profile already carries the right key: the default profile's
+  // config.apiKey, or a named profile's stored key. Empty is fine and
+  // non-fatal — `kite login` sets it up, and `kite config` must work before it
+  // exists.
   return profile.apiKey;
 }
 
 async function resolveAccessToken(
-  env: Environment,
   session: SessionMeta | null,
   apiKey: string,
   io: Io,
@@ -212,9 +195,8 @@ async function resolveAccessToken(
 
   if (!session) return found.value;
 
-  // The stored token belongs to a different environment or API key — treat it
-  // as absent rather than sending a token that will 403.
-  if (session.env !== env) return undefined;
+  // The stored token belongs to a different API key — treat it as absent
+  // rather than sending a token that will 403.
   if (apiKey && session.apiKey && session.apiKey !== apiKey) return undefined;
 
   // Locally-known expiry is a floor, not a guarantee: a master logout from Kite

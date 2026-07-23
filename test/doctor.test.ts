@@ -67,15 +67,6 @@ describe('kite doctor', () => {
     expect(byName['Session'].detail).toMatch(/not logged in/i);
   });
 
-  it('reports the sandbox credentials as ok under --env sandbox', async () => {
-    const code = await invoke(['doctor', '--json', '--env', 'sandbox']);
-    expect(code).toBe(ExitCode.Ok);
-    const doc = JSON.parse(out);
-    expect(doc.env).toBe('sandbox');
-    const apiSecret = doc.checks.find((c: { name: string }) => c.name === 'API secret');
-    expect(apiSecret.status).toBe('ok');
-  });
-
   it('renders a human table with status markers', async () => {
     const code = await invoke(['doctor']);
     expect(code).toBe(ExitCode.Ok);

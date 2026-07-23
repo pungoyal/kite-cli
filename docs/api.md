@@ -22,7 +22,7 @@ npm install @pungoyal/kite-cli
 ```
 
 ```ts
-import { KiteApi, KiteClient, endpointsFor } from '@pungoyal/kite-cli';
+import { ENDPOINTS, KiteApi, KiteClient } from '@pungoyal/kite-cli';
 ```
 
 ## `KiteClient` — HTTP transport
@@ -31,12 +31,12 @@ The low-level transport: rate limiting, retries, redaction, and response
 validation, all as one `request()` call.
 
 ```ts
-import { KiteClient, endpointsFor } from '@pungoyal/kite-cli';
+import { ENDPOINTS, KiteClient } from '@pungoyal/kite-cli';
 
 const client = new KiteClient({
   apiKey: process.env.KITE_API_KEY!,
   accessToken: process.env.KITE_ACCESS_TOKEN!,
-  endpoints: endpointsFor('production'), // or 'sandbox'
+  endpoints: ENDPOINTS,
 });
 ```
 
@@ -45,11 +45,8 @@ client before login), `endpoints`, `limiter` (a `RateLimiter` instance, one
 is created for you if omitted), `debug`/`onDebug` (redacted diagnostics),
 `timeoutMs`.
 
-`endpointsFor(env)` (`env` is `'production' | 'sandbox'`, the `Environment`
-type) resolves the `Endpoints` (`{ api, ws, login, routePrefix }`) for an
-environment — used to build both `KiteClient` and `Ticker`.
-`SANDBOX_CREDENTIALS` is Zerodha's public sandbox API key/secret pair,
-documented at [kite.trade/docs/connect/v3/sandbox](https://kite.trade/docs/connect/v3/sandbox/).
+`ENDPOINTS` is the fixed `Endpoints` (`{ api, ws, login }`) used to build both
+`KiteClient` and `Ticker`.
 
 Notable methods:
 
@@ -140,12 +137,12 @@ public surface besides `KiteApi` itself.
 ## `Ticker` — WebSocket streaming
 
 ```ts
-import { Ticker, endpointsFor } from '@pungoyal/kite-cli';
+import { ENDPOINTS, Ticker } from '@pungoyal/kite-cli';
 
 const ticker = new Ticker({
   apiKey,
   accessToken,
-  endpoints: endpointsFor('production'),
+  endpoints: ENDPOINTS,
 });
 
 ticker.on('connect', () => ticker.subscribe([408065], 'full')); // NSE:INFY
@@ -154,10 +151,9 @@ ticker.on('error', (err) => console.error(err));
 ticker.connect();
 ```
 
-`TickerOptions`: `apiKey`, `accessToken`, `endpoints`, `userId` (required by
-the sandbox WebSocket only), `maxRetries`, `maxReconnectDelayMs`,
-`readTimeoutMs` (forces a reconnect if nothing — including heartbeats —
-arrives for this long).
+`TickerOptions`: `apiKey`, `accessToken`, `endpoints`, `maxRetries`,
+`maxReconnectDelayMs`, `readTimeoutMs` (forces a reconnect if nothing —
+including heartbeats — arrives for this long).
 
 Methods: `connect()`, `subscribe(tokens, mode?)` (`mode` is `'ltp' |
 'quote' | 'full'`, default `'quote'`), `unsubscribe(tokens)`,
@@ -208,15 +204,15 @@ The same profile-resolution logic the CLI's `--profile`/`KITE_PROFILE`
 handling uses, exposed for embedders building their own multi-account
 tooling:
 
-- `resolveProfile({ profileFlag, envFlag }, config)` — resolve the
-  effective profile for a set of selectors against a loaded config object.
+- `resolveProfile({ profileFlag }, config)` — resolve the effective profile
+  for a set of selectors against a loaded config object.
 - `resolveTradingConfig(config, profile)` — the trading config actually in
   force for a profile (global settings overlaid with per-profile
   overrides, fail-closed on unset fields).
 - `getProfile(config, name)`, `listProfileNames(config)`,
   `storagePrefixFor(profile)` (the keyring/file namespace prefix for a
-  profile's secrets), `DEFAULT_PROFILE`, `SANDBOX_PROFILE` (the two
-  reserved profile name constants).
+  profile's secrets), `DEFAULT_PROFILE` (the reserved profile name
+  constant).
 
 See [configuration.md](configuration.md#profiles) for the concepts these
 implement.

@@ -15,7 +15,6 @@ export const SessionMetaSchema = z.object({
   userId: z.string(),
   userName: z.string().optional(),
   broker: z.string().optional(),
-  env: z.string(),
   apiKey: z.string(),
   /** The profile this session belongs to. Optional so pre-profile files parse. */
   profile: z.string().optional(),

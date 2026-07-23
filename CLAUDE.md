@@ -25,8 +25,11 @@ Formatting/linting is Biome (`biome.json`): 2-space, single quotes, semicolons,
 trailing commas, width 120. `noNonNullAssertion` and `useLiteralKeys` are disabled
 by design. Pre-commit hook lives in `.githooks/` — enable with `npm run hooks:install`.
 
-Tests must run with `TZ=Asia/Kolkata` (vitest config pins this). Use `--env sandbox`
-for anything that would otherwise touch a real account.
+Tests must run with `TZ=Asia/Kolkata` (vitest config pins this). There is no
+sandbox environment — Zerodha's own Kite Connect sandbox is undocumented
+beyond a login form and this CLI does not integrate with it. Use `--dry-run`
+for anything that would otherwise touch a real account; most tests run
+in-process against a mocked transport and need no live session at all.
 
 ## Architecture
 

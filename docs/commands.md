@@ -22,7 +22,6 @@ Options:
   --color <when>                    Colour output: auto, always, or never
   --quiet                           Suppress informational messages
   --debug                           Print redacted request diagnostics to stderr
-  --env <env>                       Environment: production or sandbox
   --profile <name>                  Account profile to use (see `kite profiles`)
   -y, --yes                         Skip confirmation prompts (use with care)
   --dry-run                         Show what would happen without sending
