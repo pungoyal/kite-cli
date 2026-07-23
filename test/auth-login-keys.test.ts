@@ -4,12 +4,13 @@ import { listenForKeys } from '../src/commands/auth.js';
 import type { Context } from '../src/context.js';
 
 /**
- * The login key listener enters raw mode to catch a `c` (copy the URL) and a
- * Ctrl-C (abort) while waiting for the browser callback. Raw mode makes us
- * responsible for restoring the terminal and for re-handling Ctrl-C (it arrives
- * as a byte, not a SIGINT), so the lifecycle — enter, restore, detach — is the
- * part that must never regress. A real TTY can't be driven under vitest, so we
- * swap in a fake stdin and emit the bytes ourselves.
+ * The login key listener enters raw mode to catch a `c` (copy the URL), an `m`
+ * (switch to the manual paste flow), and a Ctrl-C (abort) while waiting for the
+ * browser callback. Raw mode makes us responsible for restoring the terminal
+ * and for re-handling Ctrl-C (it arrives as a byte, not a SIGINT), so the
+ * lifecycle — enter, restore, detach — is the part that must never regress. A
+ * real TTY can't be driven under vitest, so we swap in a fake stdin and emit
+ * the bytes ourselves.
  *
  * The `c`-copy path is deliberately not exercised here: it spawns a real
  * clipboard binary (pbcopy/wl-copy/…), and this suite is mock-free by design.
@@ -107,6 +108,35 @@ describe('listenForKeys', () => {
     expect(fake.rawCalls).toEqual([true, false]); // one restore despite two calls
     expect(fake.listenerCount('data')).toBe(0);
     expect(fake.paused).toBe(true);
+  });
+
+  it('switches to manual mode on an `m` keypress and restores the terminal', () => {
+    const fake = new FakeStdin();
+    useStdin(fake);
+    let manuals = 0;
+
+    listenForKeys(
+      ctx,
+      URL,
+      () => {},
+      () => manuals++,
+    );
+    fake.emit('data', Buffer.from('m'));
+
+    expect(manuals).toBe(1);
+    expect(fake.rawCalls).toEqual([true, false]);
+    expect(fake.listenerCount('data')).toBe(0);
+  });
+
+  it('ignores `m` when no onManual callback is given', () => {
+    const fake = new FakeStdin();
+    useStdin(fake);
+
+    listenForKeys(ctx, URL, () => {});
+    fake.emit('data', Buffer.from('m'));
+
+    expect(fake.rawCalls).toEqual([true]); // still waiting, raw mode untouched since
+    expect(fake.listenerCount('data')).toBe(1);
   });
 
   it('is a no-op when stdin is not a TTY', () => {

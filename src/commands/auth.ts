@@ -5,8 +5,11 @@ import {
   computeChecksum,
   copyToClipboard,
   generateState,
+  likelyHeadless,
   openBrowser,
+  parseRequestTokenInput,
   redirectUrlFor,
+  safeCompare,
   waitForCallback,
 } from '../core/auth.js';
 import { loadConfig, saveConfig } from '../core/config.js';
@@ -30,7 +33,10 @@ export const authCommands: CommandFactory = (program, run) => {
   program
     .command('login')
     .description('Authenticate with Kite and store a session')
-    .option('--manual', 'Paste the request token by hand instead of using a local callback server')
+    .option(
+      '--manual',
+      'Paste the request token (or redirect URL) by hand instead of using a local callback server — best for headless/SSH sessions',
+    )
     .option('--api-key <key>', 'Kite Connect API key (prompted for if absent)')
     .option('--force', 'Log in again even if the current session is still valid')
     .action(run(login));
@@ -181,15 +187,26 @@ async function callbackFlow(ctx: Context, loginUrl: string): Promise<string> {
   io.note(`  ${loginUrl}`);
   io.note('');
 
-  const opened = await openBrowser(loginUrl);
-  if (opened) {
-    io.info('Opened your browser to complete login…');
+  if (likelyHeadless()) {
+    // No X11/Wayland display: a spawned `xdg-open` has nothing to hand off to,
+    // so don't even try it — that just wastes the user's time chasing an error
+    // that was never going to succeed.
+    io.warn(
+      `No display detected — this looks like a headless or remote session, so a browser was not launched. ` +
+        `Press ${io.bold('m')} below to paste the token by hand, or open the URL on another device.`,
+    );
   } else {
-    io.warn('Could not open a browser automatically. Open the URL above manually.');
+    const opened = await openBrowser(loginUrl);
+    if (opened) {
+      io.info('Opened your browser to complete login…');
+    } else {
+      io.warn('Could not open a browser automatically. Open the URL above manually.');
+    }
   }
 
-  // Let the user grab the URL without selecting it in the terminal. Copy-on-`c`
-  // and Ctrl-C both funnel through `interrupted`, which loses the race against a
+  // Let the user grab the URL without selecting it in the terminal, or bail out
+  // of the callback wait into the manual paste flow. Copy-on-`c`, manual-on-`m`,
+  // and Ctrl-C all funnel through one of these promises, which race against a
   // successful callback. A single Ctrl-C aborts the wait — raw mode swallows the
   // SIGINT, and the loopback promise never observes ctx.signal on its own.
   let interrupt: () => void = () => {};
@@ -199,12 +216,24 @@ async function callbackFlow(ctx: Context, loginUrl: string): Promise<string> {
   const onAbort = () => interrupt();
   if (ctx.signal.aborted) onAbort();
   else ctx.signal.addEventListener('abort', onAbort, { once: true });
-  const stopKeys = listenForKeys(ctx, loginUrl, interrupt);
 
-  io.info(`Waiting for the callback (press ${io.bold('c')} to copy the login URL, Ctrl-C to abort)…`);
+  let goManual: () => void = () => {};
+  const wantsManual = new Promise<'manual'>((resolve) => {
+    goManual = () => resolve('manual');
+  });
+
+  const stopKeys = listenForKeys(ctx, loginUrl, interrupt, goManual);
+
+  io.info(
+    `Waiting for the callback (press ${io.bold('m')} to paste the token manually, ` +
+      `${io.bold('c')} to copy the login URL, Ctrl-C to abort)…`,
+  );
 
   try {
-    const result = await Promise.race([server.promise, interrupted]);
+    const result = await Promise.race([server.promise, interrupted, wantsManual]);
+    if (result === 'manual') {
+      return await manualFlow(ctx, loginUrl);
+    }
     return result.requestToken;
   } finally {
     // Always restore the terminal and detach listeners, even on abort — the
@@ -217,14 +246,20 @@ async function callbackFlow(ctx: Context, loginUrl: string): Promise<string> {
 
 /**
  * While waiting for the browser callback, listen for a `c` keypress to copy the
- * login URL, and for Ctrl-C to abort. Entering raw mode makes us responsible for
- * both restoring the terminal and re-handling Ctrl-C (raw mode no longer raises
- * SIGINT). Returns a no-op when stdin is not a TTY, and an idempotent cleanup
- * that both the caller and the Ctrl-C path can safely call.
+ * login URL, an `m` keypress to bail into the manual paste flow, and for Ctrl-C
+ * to abort. Entering raw mode makes us responsible for both restoring the
+ * terminal and re-handling Ctrl-C (raw mode no longer raises SIGINT). Returns a
+ * no-op when stdin is not a TTY, and an idempotent cleanup that both the caller
+ * and the Ctrl-C path can safely call.
  */
 // Exported for tests: the raw-mode lifecycle (enter, restore, detach) and the
 // Ctrl-C byte path are the risky parts, and a real TTY can't be driven in CI.
-export function listenForKeys(ctx: Context, loginUrl: string, onInterrupt: () => void): () => void {
+export function listenForKeys(
+  ctx: Context,
+  loginUrl: string,
+  onInterrupt: () => void,
+  onManual?: () => void,
+): () => void {
   const { io } = ctx;
   const stdin = process.stdin;
   if (!stdin.isTTY) return () => {};
@@ -253,6 +288,9 @@ export function listenForKeys(ctx: Context, loginUrl: string, onInterrupt: () =>
         if (ok) io.success('Login URL copied to clipboard.');
         else io.warn('Could not copy to the clipboard (no clipboard tool found).');
       });
+    } else if ((key === 'm' || key === 'M') && onManual) {
+      cleanup();
+      onManual();
     }
   };
 
@@ -262,18 +300,44 @@ export function listenForKeys(ctx: Context, loginUrl: string, onInterrupt: () =>
   return cleanup;
 }
 
-/** Fallback for remote shells, where no browser can reach 127.0.0.1. */
+/**
+ * Fallback for remote shells, where no browser can reach 127.0.0.1. Nothing is
+ * listening on the redirect port, so after login the user's browser lands on a
+ * page that fails to load — they can paste that whole address-bar URL back
+ * here instead of having to pick `request_token` out of it by hand.
+ */
 async function manualFlow(ctx: Context, loginUrl: string): Promise<string> {
   const { io } = ctx;
+  const expectedState = extractState(loginUrl);
+
   io.note('');
-  io.info('Open this URL, log in, then copy the `request_token` from the redirect URL:');
+  io.info('Open this URL — on this machine, your phone, or any other device — and log in:');
   io.note(`  ${loginUrl}`);
   io.note('');
+  io.info(
+    "The page it redirects to won't load (nothing is listening on this server). " +
+      'Copy that whole URL from the address bar and paste it below, or just the request_token value.',
+  );
 
-  const token = await promptText('request_token');
-  if (!token) throw new AbortedError();
-  registerSecret(token);
-  return token;
+  const input = await promptText('Redirect URL or request_token');
+  if (!input) throw new AbortedError();
+
+  const parsed = parseRequestTokenInput(input);
+  registerSecret(parsed.requestToken);
+
+  // Only a pasted full URL carries `state`; a bare token has nothing to check
+  // it against. That's a known gap, not a hole: Kite's own token exchange
+  // still binds `request_token` to the api_key/checksum that issued it, so a
+  // token from a different login attempt fails there regardless of this check.
+  if (parsed.state !== null && !safeCompare(parsed.state, expectedState)) {
+    throw new KiteCliError(
+      'That redirect URL is from a different login attempt (CSRF state mismatch).',
+      ExitCode.Auth,
+      'Run `kite login` again, and paste the URL from that same attempt.',
+    );
+  }
+
+  return parsed.requestToken;
 }
 
 function extractState(loginUrl: string): string {
