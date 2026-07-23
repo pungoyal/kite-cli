@@ -12,8 +12,8 @@ re-exports every schema in `core/schemas.ts` (`export * from './core/schemas.js'
 — enumerating all of them here would be low-signal noise for a small,
 curated surface. Revisit this decision (e.g. adopt TypeDoc) only if library
 adoption grows enough to need per-symbol generated docs; until then, a
-hand-maintained page for ~30 exports is cheaper than a generator dependency
-and build step.
+hand-maintained page for a surface this size is cheaper than a generator
+dependency and build step.
 
 ## Installation & import
 
@@ -155,8 +155,8 @@ ticker.connect();
 `maxReconnectDelayMs`, `readTimeoutMs` (forces a reconnect if nothing —
 including heartbeats — arrives for this long).
 
-Methods: `connect()`, `subscribe(tokens, mode?)` (`mode` is `'ltp' |
-'quote' | 'full'`, default `'quote'`), `unsubscribe(tokens)`,
+Methods: `connect()`, `subscribe(tokens, mode?)` (`mode` is the `TickerMode`
+type — `'ltp' | 'quote' | 'full'`, default `'quote'`), `unsubscribe(tokens)`,
 `setMode(mode, tokens)`, `close()`. Subscriptions are replayed
 automatically on every reconnect — the server keeps no subscription state
 across connections.
@@ -180,6 +180,37 @@ Index instruments and tradeable instruments use different packet layouts,
 including reordered OHLC fields — see the comments in
 [`src/core/ticker.ts`](https://github.com/pungoyal/kite-cli/blob/main/src/core/ticker.ts) if you're parsing packets
 directly rather than through `Ticker`.
+
+## `McpServer` — embed the MCP server
+
+The same JSON-RPC-over-stdio server `kite mcp` runs, if you want to host it
+yourself (e.g. with a different tool set, or over a transport other than
+stdio):
+
+```ts
+import { McpServer, type McpTool } from '@pungoyal/kite-cli';
+
+const tools: McpTool[] = [
+  {
+    name: 'ping',
+    description: 'Health check',
+    schema: z.object({}),
+    inputSchema: { type: 'object', properties: {} },
+    handler: async () => ({ ok: true }),
+  },
+];
+
+const server = new McpServer({ name: 'my-server', version: '1.0.0', tools });
+await server.serve(process.stdin, process.stdout);
+```
+
+`McpServerOptions`: `name`, `version`, `tools` (`McpTool[]`), and an optional
+`signal` — aborting it stops the serve loop after the in-flight message.
+Each `McpTool` pairs a Zod `schema` (validates the arguments at the handler
+boundary) with the `inputSchema` JSON Schema advertised in `tools/list`, plus
+the `handler` itself. See [`src/commands/mcp.ts`](https://github.com/pungoyal/kite-cli/blob/main/src/commands/mcp.ts)
+for the CLI's own read-only tool set built this way, and [the MCP server
+page](mcp.md) for why writes are deliberately not exposed.
 
 ## Auth helpers
 
@@ -205,7 +236,9 @@ handling uses, exposed for embedders building their own multi-account
 tooling:
 
 - `resolveProfile({ profileFlag }, config)` — resolve the effective profile
-  for a set of selectors against a loaded config object.
+  (a `ResolvedProfile`: `name`, `apiKey`, per-profile `trading` overrides, and
+  `explicit` — whether the caller named it directly rather than falling back
+  to the default) for a set of selectors against a loaded config object.
 - `resolveTradingConfig(config, profile)` — the trading config actually in
   force for a profile (global settings overlaid with per-profile
   overrides, fail-closed on unset fields).

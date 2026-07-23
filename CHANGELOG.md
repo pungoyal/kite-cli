@@ -20,6 +20,27 @@ While the version is `0.x`, minor releases may contain breaking changes.
   you to pick `request_token` out of it by hand; the CSRF `state` is verified
   when a full URL is pasted, closing a gap where the manual flow previously
   skipped that check entirely.
+- `kite alerts enable`/`kite alerts disable` pause or resume an alert without
+  deleting it. Kite's alerts API documents no `status` parameter on modify and
+  no dedicated toggle endpoint, so the CLI sends the request optimistically and
+  then re-reads it with a fresh `GET` (never trusting the PUT response's own
+  `status`, which could just echo the request back without persisting it)
+  before reporting success — if Kite silently ignores the field, the command
+  fails loudly (exit code 1) instead of claiming an alert is disabled while
+  it's still fully live. That matters most for `ato` alerts, which place a
+  real order when they fire, so re-enabling or disabling one goes through the
+  same kill-switch/confirmation gate as `alerts modify`. An alert already in
+  the requested state is a no-op.
+
+### Fixed
+
+- `kite alerts delete` now goes through the kill-switch/confirmation gate when
+  any target is an `ato` alert (or couldn't be verified before deleting), the
+  same way `alerts enable`/`disable`, `orders cancel`, and `gtt delete` already
+  gate their own "only unwinds risk" actions. Previously it was the one
+  order-adjacent delete/cancel command left ungated regardless of alert type —
+  with the kill switch off, you could delete an order-arming alert outright
+  even though merely disabling the same alert was correctly refused.
 
 ### Removed
 

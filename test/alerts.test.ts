@@ -297,3 +297,241 @@ describe('alerts create --order (through run)', () => {
     expect(err).toMatch(/either --order/i);
   });
 });
+
+describe('alerts enable/disable/delete (through run)', () => {
+  let agent: MockAgent;
+  let stdout: PassThrough;
+  let stderr: PassThrough;
+  let out: string;
+  let err: string;
+
+  async function seedSession(config: Record<string, unknown> = {}) {
+    await mkdir(configDir(), { recursive: true });
+    await writeFile(configFile(), JSON.stringify({ apiKey: 'testkey', env: 'production', ...config }), 'utf8');
+    await writeFile(
+      sessionFile(),
+      JSON.stringify({
+        userId: 'AB1234',
+        env: 'production',
+        apiKey: 'testkey',
+        expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+        exchanges: [],
+        products: [],
+      }),
+      'utf8',
+    );
+    process.env['KITE_ACCESS_TOKEN'] = 'testaccesstoken';
+    process.env['KITE_API_KEY'] = 'testkey';
+  }
+
+  beforeEach(async () => {
+    agent = new MockAgent();
+    agent.disableNetConnect();
+    setDispatcher(agent);
+    stdout = new PassThrough();
+    stderr = new PassThrough();
+    out = '';
+    err = '';
+    stdout.on('data', (chunk) => (out += chunk));
+    stderr.on('data', (chunk) => (err += chunk));
+    await rm(configDir(), { recursive: true, force: true });
+  });
+
+  afterEach(async () => {
+    setDispatcher(undefined);
+    await agent.close();
+    delete process.env['KITE_ACCESS_TOKEN'];
+    delete process.env['KITE_API_KEY'];
+  });
+
+  function invoke(args: string[]) {
+    return run({ argv: ['node', 'kite', ...args], streams: { stdout, stderr } });
+  }
+
+  const simpleAlert = {
+    uuid: 'alert-1',
+    status: 'enabled',
+    type: 'simple',
+    name: 'NIFTY 50 >= 27000',
+    operator: '>=',
+    rhs_type: 'constant',
+    rhs_constant: 27000,
+    lhs_exchange: 'INDICES',
+    lhs_tradingsymbol: 'NIFTY 50',
+    lhs_attribute: 'LastTradedPrice',
+  };
+
+  it('is a no-op when the alert is already in the requested state', async () => {
+    await seedSession({ trading: { enabled: true } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts/alert-1', method: 'GET' }).reply(200, { status: 'success', data: simpleAlert });
+
+    const code = await invoke(['alerts', 'enable', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(err).toMatch(/already enabled/i);
+  });
+
+  it('disables a simple alert, resends its full definition, and verifies against a fresh read', async () => {
+    await seedSession({ trading: { enabled: true } });
+    const pool = agent.get('https://api.kite.trade');
+    // Initial read.
+    pool.intercept({ path: '/alerts/alert-1', method: 'GET' }).reply(200, { status: 'success', data: simpleAlert });
+    let body = '';
+    pool.intercept({ path: '/alerts/alert-1', method: 'PUT' }).reply((opts) => {
+      body = String(opts.body);
+      return { statusCode: 200, data: { status: 'success', data: { ...simpleAlert, status: 'disabled' } } };
+    });
+    // Post-write verification read — the one that actually decides success.
+    pool
+      .intercept({ path: '/alerts/alert-1', method: 'GET' })
+      .reply(200, { status: 'success', data: { ...simpleAlert, status: 'disabled' } });
+
+    const code = await invoke(['alerts', 'disable', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(err).toMatch(/disabled/i);
+    const form = new URLSearchParams(body);
+    expect(form.get('status')).toBe('disabled');
+    expect(form.get('operator')).toBe('>=');
+    expect(form.get('rhs_constant')).toBe('27000');
+    expect(form.get('lhs_tradingsymbol')).toBe('NIFTY 50');
+  });
+
+  it('fails loudly when the PUT response echoes the new status but a fresh read shows nothing was persisted', async () => {
+    // Kite's alerts API documents no `status` parameter, so a PUT response
+    // that merely echoes the request body back — without ever having
+    // persisted it — must not be mistaken for confirmation. Only the
+    // post-write GET, not the PUT's own response, may decide success here.
+    await seedSession({ trading: { enabled: true } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts/alert-1', method: 'GET' }).reply(200, { status: 'success', data: simpleAlert });
+    pool
+      .intercept({ path: '/alerts/alert-1', method: 'PUT' })
+      .reply(200, { status: 'success', data: { ...simpleAlert, status: 'disabled' } }); // deceptive: echoes the ask
+    pool.intercept({ path: '/alerts/alert-1', method: 'GET' }).reply(200, { status: 'success', data: simpleAlert }); // reality: unchanged
+
+    const code = await invoke(['alerts', 'disable', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Failure);
+    expect(err).toMatch(/still "enabled"/i);
+  });
+
+  it('refuses to enable or disable a deleted alert', async () => {
+    await seedSession({ trading: { enabled: true } });
+    const pool = agent.get('https://api.kite.trade');
+    pool
+      .intercept({ path: '/alerts/alert-1', method: 'GET' })
+      .reply(200, { status: 'success', data: { ...simpleAlert, status: 'deleted' } });
+
+    const code = await invoke(['alerts', 'enable', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).toMatch(/deleted/i);
+  });
+
+  it('points at `alerts modify`, not a nonexistent flag, when the alert has no operator to keep', async () => {
+    // `enable`/`disable` have no --operator flag, unlike `modify` — the error
+    // this shares with `modify` must not suggest one that doesn't exist here.
+    await seedSession({ trading: { enabled: true } });
+    const pool = agent.get('https://api.kite.trade');
+    const operatorless = { ...simpleAlert, operator: undefined };
+    pool.intercept({ path: '/alerts/alert-1', method: 'GET' }).reply(200, { status: 'success', data: operatorless });
+
+    const code = await invoke(['alerts', 'disable', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).not.toMatch(/--operator explicitly/i);
+    expect(err).toMatch(/kite alerts modify --operator/i);
+  });
+
+  const atoAlert = {
+    ...simpleAlert,
+    uuid: 'alert-2',
+    type: 'ato',
+    status: 'disabled',
+    basket: {
+      name: 'kite-cli-alert',
+      type: 'alert',
+      tags: [],
+      items: [
+        {
+          type: 'insert',
+          tradingsymbol: 'NIFTY',
+          exchange: 'NFO',
+          weight: 10000,
+          params: { transaction_type: 'BUY', order_type: 'MARKET', product: 'NRML', quantity: 50 },
+        },
+      ],
+    },
+  };
+
+  it('requires the kill switch to be on before re-enabling an ato alert', async () => {
+    await seedSession({ trading: { enabled: false } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts/alert-2', method: 'GET' }).reply(200, { status: 'success', data: atoAlert });
+
+    const code = await invoke(['alerts', 'enable', 'alert-2', '--yes']);
+
+    expect(code).toBe(ExitCode.TradingDisabled);
+  });
+
+  it('carries an ato basket through unchanged when toggling status', async () => {
+    await seedSession({ trading: { enabled: true } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts/alert-2', method: 'GET' }).reply(200, { status: 'success', data: atoAlert });
+    let body = '';
+    pool.intercept({ path: '/alerts/alert-2', method: 'PUT' }).reply((opts) => {
+      body = String(opts.body);
+      return { statusCode: 200, data: { status: 'success', data: { ...atoAlert, status: 'enabled' } } };
+    });
+    pool
+      .intercept({ path: '/alerts/alert-2', method: 'GET' })
+      .reply(200, { status: 'success', data: { ...atoAlert, status: 'enabled' } });
+
+    const code = await invoke(['alerts', 'enable', 'alert-2', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    const sentBasket = JSON.parse(new URLSearchParams(body).get('basket') ?? '{}');
+    expect(sentBasket).toEqual(atoAlert.basket);
+  });
+
+  it('requires the kill switch to be on before deleting a confirmed ato alert', async () => {
+    // Deletion cancels a live order-arming trigger — the same gate `disable`
+    // applies, and the same gate `orders cancel`/`gtt delete` apply to their
+    // own unwind actions.
+    await seedSession({ trading: { enabled: false } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts', method: 'GET' }).reply(200, { status: 'success', data: [atoAlert] });
+
+    const code = await invoke(['alerts', 'delete', 'alert-2', '--yes']);
+
+    expect(code).toBe(ExitCode.TradingDisabled);
+  });
+
+  it('does not require the kill switch to delete a confirmed simple alert', async () => {
+    await seedSession({ trading: { enabled: false } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts', method: 'GET' }).reply(200, { status: 'success', data: [simpleAlert] });
+    pool
+      .intercept({ path: (p) => p.startsWith('/alerts') && !p.includes('history'), method: 'DELETE' })
+      .reply(200, { status: 'success', data: {} });
+
+    const code = await invoke(['alerts', 'delete', 'alert-1', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+  });
+
+  it('fails closed and requires the kill switch when an alert cannot be verified before deletion', async () => {
+    // The lookup succeeds but doesn't contain this uuid (could equally be a
+    // total lookup failure) — an unverifiable alert is treated as though it
+    // might be ato, never assumed simple.
+    await seedSession({ trading: { enabled: false } });
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/alerts', method: 'GET' }).reply(200, { status: 'success', data: [] });
+
+    const code = await invoke(['alerts', 'delete', 'unknown-uuid', '--yes']);
+
+    expect(code).toBe(ExitCode.TradingDisabled);
+  });
+});

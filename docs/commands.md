@@ -666,6 +666,8 @@ Commands:
   history <uuid>                 Show an alert's trigger history
   create [options] <instrument>  Create a price alert
   modify [options] <uuid>        Modify an existing alert
+  enable <uuid>                  Re-enable a disabled alert
+  disable <uuid>                 Disable an alert without deleting it
   delete <uuid...>               Delete one or more alerts
   help [command]                 display help for command
 ```
@@ -759,6 +761,28 @@ Options:
   --value <n>          New threshold constant
   --name <name>        New alert name
   -h, --help           display help for command
+```
+
+### `kite alerts enable`
+
+```
+Usage: kite alerts enable [options] <uuid>
+
+Re-enable a disabled alert
+
+Options:
+  -h, --help  display help for command
+```
+
+### `kite alerts disable`
+
+```
+Usage: kite alerts disable [options] <uuid>
+
+Disable an alert without deleting it
+
+Options:
+  -h, --help  display help for command
 ```
 
 ### `kite alerts delete`

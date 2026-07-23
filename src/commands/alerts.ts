@@ -15,7 +15,7 @@ import {
   VALIDITIES,
   type Validity,
 } from '../core/api.js';
-import { UsageError } from '../core/errors.js';
+import { ExitCode, KiteCliError, UsageError } from '../core/errors.js';
 import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js';
 import type { Alert, AlertHistoryEntry } from '../core/schemas.js';
 import { dateTime, money, quantity, rupees } from '../output/format.js';
@@ -90,6 +90,14 @@ export const alertCommands: CommandFactory = (program, run) => {
     .option('--value <n>', 'New threshold constant')
     .option('--name <name>', 'New alert name')
     .action(run(modifyAlert));
+
+  alerts.command('enable').description('Re-enable a disabled alert').argument('<uuid>').action(run(enableAlert));
+
+  alerts
+    .command('disable')
+    .description('Disable an alert without deleting it')
+    .argument('<uuid>')
+    .action(run(disableAlert));
 
   alerts
     .command('delete')
@@ -655,57 +663,21 @@ async function modifyAlert(
     throw new UsageError('Nothing to modify. Pass at least one of --operator, --value or --name.');
   }
 
-  // Kite's PUT replaces the whole alert, so we start from the current one and
-  // overlay the changes — including carrying the existing ATO basket through
-  // untouched, which is why we read it back rather than reconstructing it.
   const existing = await ctx.api.getAlert(uuid, ctx.signal);
-
-  const type = existing.type === 'ato' ? 'ato' : ('simple' as AlertType);
-  const operator =
-    opts.operator !== undefined ? normaliseOperator(opts.operator) : (existing.operator as AlertOperator);
-  if (!operator || !(ALERT_OPERATORS as readonly string[]).includes(operator)) {
-    throw new UsageError('This alert has no valid operator to keep; pass --operator explicitly.');
-  }
-
-  const rhsType = existing.rhs_type === 'instrument' ? 'instrument' : 'constant';
-  const params: AlertParams = {
-    name: opts.name ?? existing.name ?? describeCondition(existing),
-    type,
-    lhs_exchange: existing.lhs_exchange ?? '',
-    lhs_tradingsymbol: existing.lhs_tradingsymbol ?? '',
-    lhs_attribute: existing.lhs_attribute ?? ALERT_DEFAULT_ATTRIBUTE,
-    operator,
-    rhs_type: rhsType,
-  };
-
-  if (rhsType === 'instrument') {
-    params.rhs_exchange = existing.rhs_exchange;
-    params.rhs_tradingsymbol = existing.rhs_tradingsymbol;
-    params.rhs_attribute = existing.rhs_attribute ?? ALERT_DEFAULT_ATTRIBUTE;
-  } else {
-    if (opts.value !== undefined) {
-      const value = Number(opts.value);
-      if (!Number.isFinite(value)) throw new UsageError('--value must be a number.');
-      params.rhs_constant = value;
-    } else {
-      params.rhs_constant = existing.rhs_constant;
-    }
-  }
-
-  if (existing.basket) {
-    // Carry the ATO order through unchanged. The basket read back has richer
-    // fields than we send, but Kite accepts the round-trip.
-    params.basket = existing.basket as unknown as AlertBasket;
-  }
+  const params = alertParamsFromExisting(existing, {
+    name: opts.name,
+    operator: opts.operator !== undefined ? normaliseOperator(opts.operator) : undefined,
+    value: opts.value,
+  });
 
   const before = describeCondition(existing);
-  const after = describeCondition({ ...existing, operator, rhs_constant: params.rhs_constant });
+  const after = describeCondition({ ...existing, operator: params.operator, rhs_constant: params.rhs_constant });
 
   await confirmAction(ctx, {
     action: `Modify alert ${existing.name ?? uuid}`,
     // An ATO alert carries an order; modifying its trigger changes when that
     // order fires, so apply the trading guard rails as for creation.
-    mutatesOrders: type === 'ato',
+    mutatesOrders: params.type === 'ato',
     details: [
       { label: 'UUID', value: uuid },
       { label: 'Condition', value: before === after ? before : `${before} → ${after}` },
@@ -721,6 +693,173 @@ async function modifyAlert(
     return;
   }
   ctx.io.success(`Alert ${result.uuid} modified.`);
+}
+
+/**
+ * Rebuild a full AlertParams from an existing alert — Kite's PUT replaces the
+ * whole alert rather than patching fields, so every call site that modifies
+ * one field still has to resend the rest unchanged (including carrying the
+ * existing ATO basket through untouched; the basket read back has richer
+ * fields than we send, but Kite accepts the round-trip).
+ *
+ * `overrides.value` only takes effect when the alert's right-hand side is a
+ * constant — an instrument-referencing RHS has no threshold to overwrite, so
+ * it is silently ignored there rather than rejected, matching the pre-existing
+ * `modify` behaviour this was extracted from. `overrides.status` is used only
+ * by `enable`/`disable`; `modify` never sets it, so its PUT calls carry no
+ * `status` field, unchanged from before this helper existed.
+ */
+function alertParamsFromExisting(
+  existing: Alert,
+  overrides: { name?: string; operator?: AlertOperator; value?: string; status?: 'enabled' | 'disabled' } = {},
+): AlertParams {
+  const type = existing.type === 'ato' ? 'ato' : ('simple' as AlertType);
+  const operator = overrides.operator ?? (existing.operator as AlertOperator);
+  if (!operator || !(ALERT_OPERATORS as readonly string[]).includes(operator)) {
+    // Shared by modify, enable and disable — none of which can assume the
+    // others' flags exist, so point at a command rather than a specific flag.
+    throw new UsageError(
+      'This alert has no valid operator to keep.',
+      'Run `kite alerts modify --operator <op>` to set one first.',
+    );
+  }
+
+  const rhsType = existing.rhs_type === 'instrument' ? 'instrument' : 'constant';
+  const params: AlertParams = {
+    name: overrides.name ?? existing.name ?? describeCondition(existing),
+    type,
+    lhs_exchange: existing.lhs_exchange ?? '',
+    lhs_tradingsymbol: existing.lhs_tradingsymbol ?? '',
+    lhs_attribute: existing.lhs_attribute ?? ALERT_DEFAULT_ATTRIBUTE,
+    operator,
+    rhs_type: rhsType,
+  };
+
+  if (rhsType === 'instrument') {
+    params.rhs_exchange = existing.rhs_exchange;
+    params.rhs_tradingsymbol = existing.rhs_tradingsymbol;
+    params.rhs_attribute = existing.rhs_attribute ?? ALERT_DEFAULT_ATTRIBUTE;
+  } else if (overrides.value !== undefined) {
+    const value = Number(overrides.value);
+    if (!Number.isFinite(value)) throw new UsageError('--value must be a number.');
+    params.rhs_constant = value;
+  } else {
+    params.rhs_constant = existing.rhs_constant;
+  }
+
+  if (existing.basket) {
+    params.basket = existing.basket as unknown as AlertBasket;
+  }
+  if (overrides.status) params.status = overrides.status;
+
+  return params;
+}
+
+// ---------------------------------------------------------------------------
+// Enable / disable
+// ---------------------------------------------------------------------------
+
+async function enableAlert(ctx: Context, _opts: unknown, command: { args: string[] }): Promise<void> {
+  await setAlertStatus(ctx, command.args[0], 'enabled');
+}
+
+async function disableAlert(ctx: Context, _opts: unknown, command: { args: string[] }): Promise<void> {
+  await setAlertStatus(ctx, command.args[0], 'disabled');
+}
+
+/**
+ * Kite's alerts API documents no `status` parameter on modify and no
+ * dedicated enable/disable endpoint — `status` only ever appears as a
+ * response field (neither official SDK implements the alerts API at all, so
+ * there's no reference implementation to check either). We send it as an
+ * optimistic field on the PUT anyway, since real behaviour can lag docs, but
+ * never just trust the request "succeeded": a fresh GET after the PUT is
+ * checked, and a mismatch fails loudly rather than reporting an alert as
+ * disabled while it is still fully live. The PUT's own response is NOT used
+ * for that check — an undocumented field could be echoed straight back from
+ * the request body without ever being persisted, which would make the PUT
+ * response lie exactly the way this check exists to catch. That distinction
+ * matters most for `ato` alerts, which place a real order when they fire — a
+ * silently-ignored disable there would be a false sense of safety, not a
+ * cosmetic bug.
+ */
+async function setAlertStatus(
+  ctx: Context,
+  uuidArg: string | undefined,
+  status: 'enabled' | 'disabled',
+): Promise<void> {
+  ctx.requireSession();
+  const uuid = requireUuid(uuidArg);
+  const existing = await ctx.api.getAlert(uuid, ctx.signal);
+
+  if (existing.status === 'deleted') {
+    throw new UsageError(`Alert ${uuid} has been deleted and cannot be ${status}.`);
+  }
+
+  if (existing.status === status) {
+    if (ctx.io.json) {
+      ctx.io.writeJson(existing);
+      return;
+    }
+    ctx.io.success(`Alert ${existing.name ?? uuid} is already ${status}.`);
+    return;
+  }
+
+  const params = alertParamsFromExisting(existing, { status });
+
+  await confirmAction(ctx, {
+    action: `${status === 'enabled' ? 'Enable' : 'Disable'} alert ${existing.name ?? uuid}`,
+    // Re-enabling an ato alert restores its ability to place a real order when
+    // it fires, and disabling one is a change to that same order-triggering
+    // config — gate both behind the trading guard rails, as for `modify`.
+    //
+    // Deliberately no `increasesExposure`/`notionalValue` here: the basket was
+    // already priced and value-capped at `create` time. Re-checking it against
+    // today's cap on `enable` would mean re-quoting every leg (the same work
+    // `buildAtoBasket` does at creation) just to toggle a status flag — real
+    // scope, not a one-line addition. The gap this leaves: if `maxOrderValue`
+    // was tightened after the alert was created, `enable` can still re-arm a
+    // basket that now exceeds it. Left as a known limitation rather than
+    // silently "fixed" with an unpriced check.
+    mutatesOrders: params.type === 'ato',
+    details: [
+      { label: 'UUID', value: uuid },
+      { label: 'Condition', value: describeCondition(existing) },
+      {
+        label: 'Status',
+        value: `${colourAlertStatus(ctx.io, existing.status)} → ${colourAlertStatus(ctx.io, status)}`,
+      },
+    ],
+  });
+
+  if (ctx.options.dryRun) return;
+
+  await ctx.api.modifyAlert(uuid, params, ctx.signal);
+
+  // Verify against a FRESH read, not the PUT response: an undocumented field
+  // could just be echoed back from the request body without ever being
+  // persisted, which would make the PUT response say "disabled" for an alert
+  // Kite never actually touched. A re-GET reflects what was actually stored —
+  // its only failure mode is read-after-write lag, which errs toward a
+  // spurious failure here, never a false "disabled" on a still-live alert.
+  const verified = await ctx.api.getAlert(uuid, ctx.signal);
+
+  if (verified.status !== status) {
+    throw new KiteCliError(
+      `Kite accepted the request, but alert ${uuid} is still "${verified.status}", not "${status}".`,
+      ExitCode.Failure,
+      "Kite's alerts API does not document a way to toggle status, so this may not be supported. " +
+        (params.type === 'ato'
+          ? 'Delete and recreate the alert instead.'
+          : '`kite alerts delete` removes it outright.'),
+    );
+  }
+
+  if (ctx.io.json) {
+    ctx.io.writeJson(verified);
+    return;
+  }
+  ctx.io.success(`Alert ${verified.name ?? uuid} ${status}.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -742,8 +881,17 @@ async function deleteAlerts(ctx: Context, _opts: unknown, command: { args: strin
     ctx.io.warn('Could not read your alerts from Kite; the details below are unverified.');
   }
 
+  // Deleting an `ato` alert cancels a live order-arming trigger — the same
+  // kill-switch gate `enable`/`disable` and `orders cancel`/`gtt delete` apply
+  // to their own unwind actions, despite all of them reducing risk rather than
+  // increasing it. A `simple` alert moves no money and stays ungated, matching
+  // `create`/`modify`/`enable`/`disable`. An alert we could not verify is
+  // treated as though it might be `ato` — fail closed, not "assume simple".
+  const mayBeAto = uuids.some((uuid) => known.get(uuid)?.type === 'ato' || !known.has(uuid));
+
   await confirmAction(ctx, {
     action: uuids.length === 1 ? `Delete alert ${uuids[0]}` : `Delete ${uuids.length} alerts`,
+    mutatesOrders: mayBeAto,
     details: uuids.map((uuid) => {
       const alert = known.get(uuid);
       return {

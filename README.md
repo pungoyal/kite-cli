@@ -207,6 +207,8 @@ kite alerts list                       # your price alerts
 kite alerts create "INDICES:NIFTY 50" --operator above --value 27000
 kite alerts get <uuid>                 # detail, incl. any attached order
 kite alerts history <uuid>             # when it has fired
+kite alerts disable <uuid>             # pause without losing the definition
+kite alerts enable <uuid>
 kite alerts delete <uuid> [<uuid>...]
 ```
 
@@ -241,6 +243,13 @@ mutually exclusive.
 `--operator` accepts the raw symbols (`>=`, `<=`, `>`, `<`, `==`) or the aliases
 `above`, `below`, `ge`, `le`, `gt`, `lt`, `eq`. Compare against another instrument
 instead of a constant with `--rhs-instrument EXCHANGE:SYMBOL`.
+
+`kite alerts enable`/`disable` pause or resume an alert without deleting it.
+Kite's alerts API does not document a way to toggle status, so the CLI sends
+the request and then re-reads the alert to confirm it actually took effect —
+if Kite silently ignores it, the command fails loudly rather than reporting an
+alert as disabled while it's still live. That distinction matters most for ATO
+alerts, which place a real order when they fire.
 
 Add `--dry-run` to any of these to see exactly what would be sent, without sending it.
 
@@ -292,6 +301,18 @@ kite whoami --json || kite login       # exit code 3 means "no session"
 | 13 | Blocked by the local kill switch or order value cap |
 
 `NO_COLOR` is honoured, and colour is disabled automatically when stdout is not a TTY.
+
+### Diagnostics & shell completion
+
+```bash
+kite doctor                      # offline health checks — config, keyring, session expiry, callback port
+kite completion bash > kite.bash # or zsh / fish; auto-detected from $SHELL if omitted
+```
+
+`kite doctor` makes no network call — it's the first thing to run when something
+seems off locally, before chasing it as a Kite-side problem. See
+[Troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) for what
+each check covers.
 
 ### Agents (MCP)
 
@@ -435,6 +456,7 @@ To report a vulnerability, see [SECURITY.md](https://github.com/pungoyal/kite-cl
 ```bash
 kite config show
 kite config set <key> <value>
+kite config unset <key>
 kite config path
 ```
 
@@ -450,7 +472,7 @@ kite config path
 
 Config lives at `~/.config/kite/config.json` (`0600`). Override the location with `KITE_CONFIG_DIR`.
 
-`trading.*`, `apiKey`, and `env` can be set per profile by adding `--profile <name>`
+`trading.*` and `apiKey` can be set per profile by adding `--profile <name>`
 (see [Multiple accounts](#multiple-accounts)); the remaining keys are global. The
 account this invocation resolves to is selected by `--profile` / `KITE_PROFILE`.
 

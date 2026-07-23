@@ -679,6 +679,13 @@ export interface AlertParams {
   rhs_attribute?: string | undefined;
   /** Present only for `ato` alerts; placed as an order when the alert fires. */
   basket?: AlertBasket | undefined;
+  /**
+   * Optimistic only: Kite's documented modify parameters do not include
+   * `status`, and neither official SDK implements the alerts API at all. Sent
+   * anyway since undocumented behaviour can lag the docs, but the caller must
+   * verify the response's own `status` rather than trust this was honoured.
+   */
+  status?: 'enabled' | 'disabled' | undefined;
 }
 
 /**
@@ -707,6 +714,9 @@ function serialiseAlert(params: AlertParams): Record<string, string | number | u
 
   if (params.basket) {
     form.basket = JSON.stringify(params.basket);
+  }
+  if (params.status) {
+    form.status = params.status;
   }
   return form;
 }
