@@ -5,6 +5,12 @@ CLI against a real Kite Connect app. For the exit code a script can branch
 on, see the README's [exit code table](https://github.com/pungoyal/kite-cli#scripting); this page
 explains *why* each one happens and what to do about it.
 
+Before digging through the sections below, run `kite doctor` — it makes no
+network call and checks config file existence/permissions, OS keyring
+reachability, whether an API secret is stored, the cached session's expiry,
+and whether the login callback port is free. It's the fastest way to rule out
+a local setup problem before treating something as a Kite-side issue.
+
 ## "Not logged in" / `whoami` fails, exit code 3
 
 **Most likely: it's after 06:00 IST.** Kite Connect sessions die at 06:00

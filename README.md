@@ -295,6 +295,18 @@ kite whoami --json || kite login       # exit code 3 means "no session"
 
 `NO_COLOR` is honoured, and colour is disabled automatically when stdout is not a TTY.
 
+### Diagnostics & shell completion
+
+```bash
+kite doctor                      # offline health checks — config, keyring, session expiry, callback port
+kite completion bash > kite.bash # or zsh / fish; auto-detected from $SHELL if omitted
+```
+
+`kite doctor` makes no network call — it's the first thing to run when something
+seems off locally, before chasing it as a Kite-side problem. See
+[Troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) for what
+each check covers.
+
 ### Agents (MCP)
 
 `kite mcp` exposes Kite's **read-only** endpoints to an LLM agent over the
@@ -437,6 +449,7 @@ To report a vulnerability, see [SECURITY.md](https://github.com/pungoyal/kite-cl
 ```bash
 kite config show
 kite config set <key> <value>
+kite config unset <key>
 kite config path
 ```
 
@@ -452,7 +465,7 @@ kite config path
 
 Config lives at `~/.config/kite/config.json` (`0600`). Override the location with `KITE_CONFIG_DIR`.
 
-`trading.*`, `apiKey`, and `env` can be set per profile by adding `--profile <name>`
+`trading.*` and `apiKey` can be set per profile by adding `--profile <name>`
 (see [Multiple accounts](#multiple-accounts)); the remaining keys are global. The
 account this invocation resolves to is selected by `--profile` / `KITE_PROFILE`.
 
