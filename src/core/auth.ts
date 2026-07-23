@@ -77,6 +77,57 @@ export function generateState(): string {
   return randomBytes(16).toString('hex');
 }
 
+export interface ParsedRequestToken {
+  requestToken: string;
+  /** Present only when the input was a full redirect URL that carried it. */
+  state: string | null;
+}
+
+/**
+ * Accept either a bare `request_token` or the full URL Kite redirects the
+ * browser to. Headless/SSH users have nothing listening on the redirect port,
+ * so their browser lands on a "can't reach this page" screen — copying the
+ * whole address-bar URL is far less error-prone for them than hunting for one
+ * query parameter by hand.
+ */
+export function parseRequestTokenInput(input: string): ParsedRequestToken {
+  const trimmed = input.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return { requestToken: trimmed, state: null };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new UsageError(
+      'That does not look like a valid URL.',
+      'Paste the full redirect URL from your browser, or just the request_token value.',
+    );
+  }
+
+  const requestToken = url.searchParams.get('request_token');
+  if (!requestToken) {
+    throw new UsageError(
+      'No request_token found in that URL.',
+      'Paste the full redirect URL Kite sent your browser to, or just the request_token value.',
+    );
+  }
+  return { requestToken, state: url.searchParams.get('state') };
+}
+
+/**
+ * Best-effort guess that no browser can be launched from this process: not
+ * macOS/Windows (where a GUI session is almost always present) and no X11/
+ * Wayland display, which is how `xdg-open` itself decides it has nothing to
+ * talk to. Used only to tailor messaging — the callback flow still runs
+ * unchanged, since SSH port forwarding can make it work anyway.
+ */
+export function likelyHeadless(): boolean {
+  if (process.platform === 'darwin' || process.platform === 'win32') return false;
+  return !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+}
+
 export interface CallbackResult {
   requestToken: string;
 }

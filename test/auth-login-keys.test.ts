@@ -109,6 +109,35 @@ describe('listenForKeys', () => {
     expect(fake.paused).toBe(true);
   });
 
+  it('switches to manual mode on an `m` keypress and restores the terminal', () => {
+    const fake = new FakeStdin();
+    useStdin(fake);
+    let manuals = 0;
+
+    listenForKeys(
+      ctx,
+      URL,
+      () => {},
+      () => manuals++,
+    );
+    fake.emit('data', Buffer.from('m'));
+
+    expect(manuals).toBe(1);
+    expect(fake.rawCalls).toEqual([true, false]);
+    expect(fake.listenerCount('data')).toBe(0);
+  });
+
+  it('ignores `m` when no onManual callback is given', () => {
+    const fake = new FakeStdin();
+    useStdin(fake);
+
+    listenForKeys(ctx, URL, () => {});
+    fake.emit('data', Buffer.from('m'));
+
+    expect(fake.rawCalls).toEqual([true]); // still waiting, raw mode untouched since
+    expect(fake.listenerCount('data')).toBe(1);
+  });
+
   it('is a no-op when stdin is not a TTY', () => {
     const fake = new FakeStdin();
     fake.isTTY = false;

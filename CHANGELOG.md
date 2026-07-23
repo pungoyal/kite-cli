@@ -8,6 +8,19 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **Better `kite login` UX on headless servers.** `kite login` now detects when
+  no browser can plausibly be launched (no `DISPLAY`/`WAYLAND_DISPLAY` on
+  Linux) and skips the doomed `xdg-open` attempt with a clearer message. While
+  waiting for the loopback callback, press `m` to drop into the manual flow
+  without restarting the command. `kite login --manual` (and the `m` handoff)
+  now accept pasting the *whole* redirect URL — the page your browser lands on
+  after login, which fails to load on a headless server — instead of requiring
+  you to pick `request_token` out of it by hand; the CSRF `state` is verified
+  when a full URL is pasted, closing a gap where the manual flow previously
+  skipped that check entirely.
+
 ### Removed
 
 - **Sandbox support (`--env`/`KITE_ENV`, the reserved `sandbox` profile) is

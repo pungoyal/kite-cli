@@ -99,6 +99,13 @@ kite login
 
 This opens your browser, you log in to Zerodha normally (including your TOTP), and the CLI captures the callback on loopback. The login URL is also printed to the terminal — press `c` while it's waiting to copy it to your clipboard (handy if the browser didn't open, or you want to log in on another device). Your API secret goes into your OS keyring; the daily access token is stored alongside it.
 
+**Running on a headless server (SSH, a container, CI)?** There's no browser to reach `127.0.0.1` on a remote box, so `kite login` detects the missing display and skips trying to launch one. You have two options:
+
+- Just run `kite login` as usual and press `m` when it's waiting for the callback — that drops you into the manual flow below without starting over.
+- Run `kite login --manual` directly. It prints the login URL to open on your phone or any other device; after you log in there, the browser lands on a page that fails to load (nothing is listening on that port on the server) — copy the *whole URL* from the address bar and paste it back into the terminal. Pasting just the `request_token` value still works too.
+
+Either way, the API secret prompt still needs a TTY — set `KITE_API_SECRET` (and `KITE_API_KEY`, `KITE_ACCESS_TOKEN`) as environment variables instead if you're scripting this non-interactively.
+
 **Running more than one Zerodha account?** See [Multiple accounts](#multiple-accounts).
 
 ## Usage

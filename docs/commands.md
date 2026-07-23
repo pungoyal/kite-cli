@@ -107,8 +107,9 @@ Usage: kite login [options]
 Authenticate with Kite and store a session
 
 Options:
-  --manual         Paste the request token by hand instead of using a local
-                   callback server
+  --manual         Paste the request token (or redirect URL) by hand instead of
+                   using a local callback server — best for headless/SSH
+                   sessions
   --api-key <key>  Kite Connect API key (prompted for if absent)
   --force          Log in again even if the current session is still valid
   -h, --help       display help for command
