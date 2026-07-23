@@ -24,7 +24,6 @@ Source of truth: [`src/core/config.ts`](https://github.com/pungoyal/kite-cli/blo
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `apiKey` | string | — | Kite Connect API key for the `default` profile. Semi-public (it appears in login URLs). |
-| `env` | `production` \| `sandbox` | `production` | Environment for the `default` profile. |
 | `trading.enabled` | boolean | `true` | Master kill switch. `false` refuses every order-mutating command before any network call. |
 | `trading.confirm` | boolean | `true` | Require an interactive confirmation before money-moving actions. |
 | `trading.maxOrderValue` | number (rupees) | unset (no cap) | Refuse any single exposure-increasing order above this notional value. |
@@ -43,7 +42,7 @@ There is deliberately **no key that disables confirmations globally** — see
 
 ### Per-profile overrides
 
-`trading.*`, `apiKey`, and `env` can be scoped to a single profile by adding
+`trading.*` and `apiKey` can be scoped to a single profile by adding
 `--profile <name>` to `config set`:
 
 ```bash
@@ -63,8 +62,7 @@ effect on any other profile's cap. See `resolveTradingConfig` in
 | `KITE_ACCESS_TOKEN` | Supplies the access token directly, bypassing the keyring/file store entirely. | No — always read fresh, never written to disk. |
 | `KITE_API_SECRET` | Supplies the API secret directly. | No |
 | `KITE_API_KEY` | Overrides the resolved profile's API key. | No |
-| `KITE_ENV` | Same as `--env`; see [precedence](#profile-and-environment-resolution) below. | No |
-| `KITE_PROFILE` | Same as `--profile`; see [precedence](#profile-and-environment-resolution) below. | No |
+| `KITE_PROFILE` | Same as `--profile`; see [precedence](#profile-resolution) below. | No |
 | `KITE_CONFIG_DIR` | Overrides `~/.config/kite` for `config.json`, `session*.json`, and `credentials.enc`. | — |
 | `KITE_CACHE_DIR` | Overrides `~/.cache/kite` for the instrument master cache. | — |
 | `KITE_CREDENTIALS_PASSPHRASE` | Passphrase for the encrypted-file credential store, used only when no OS keyring is available. | — |
@@ -96,51 +94,40 @@ For each secret (`api_secret`, `access_token`), lookup tries, in order:
    interactively where the caller supports it).
 
 Secrets are namespaced per profile via a storage prefix — `''` for
-`default`, `sandbox:` for the reserved sandbox profile, `profile:<name>:`
-for everything else — so multiple accounts' secrets never collide in the
-same keyring/file. See `storagePrefixFor` in
+`default`, `profile:<name>:` for everything else — so multiple accounts'
+secrets never collide in the same keyring/file. See `storagePrefixFor` in
 [`src/core/profiles.ts`](https://github.com/pungoyal/kite-cli/blob/main/src/core/profiles.ts).
 
 ## Profiles
 
 A **profile** is a named Zerodha account: its own Kite Connect app (API key
-and secret), its own environment, its own session, and optional per-profile
-trading overrides. Two names are reserved and need no entry in
-`config.profiles`:
+and secret), its own session, and optional per-profile trading overrides.
+One name is reserved and needs no entry in `config.profiles`:
 
 - `default` — the original single-account setup; unprefixed secrets and
   `session.json`, so existing installs need no migration.
-- `sandbox` — Zerodha's public sandbox, one fixed identity shared by
-  everyone; `--env sandbox` is shorthand for `--profile sandbox`.
 
 Manage profiles with `kite profiles add/list/remove/use/current` — see the
 README's [Multiple accounts](https://github.com/pungoyal/kite-cli#multiple-accounts) section for
 the walkthrough.
 
-### Profile and environment resolution
+### Profile resolution
 
 The account a command targets is resolved fresh on every invocation (there
 is no sticky "active account"), in this order:
 
 1. `--profile <name>` on the command line
 2. `KITE_PROFILE` environment variable
-3. `--env sandbox` / `KITE_ENV=sandbox` — an alias for `--profile sandbox`,
-   not an explicit account choice
-4. `config.defaultProfile` (set by `kite profiles use <name>`)
-5. otherwise the `default` profile
-
-An explicit `--env` / `KITE_ENV` value is then applied on top of the
-resolved profile's own environment — so `--env production` always forces
-production regardless of which profile it lands on.
+3. `config.defaultProfile` (set by `kite profiles use <name>`)
+4. otherwise the `default` profile
 
 **Fail-closed guard:** if a profile was named *explicitly* (via `--profile`
-or `KITE_PROFILE` — steps 1–2 above, not the sandbox alias or the
-configured default), and `KITE_ACCESS_TOKEN` or `KITE_API_SECRET` is also
-set in the environment, the command refuses rather than letting the
-environment variable silently override the named profile's own stored
-credentials. This is the guard against accidentally running a command
-against the wrong account because an ambient env var meant for scripting
-was left set.
+or `KITE_PROFILE` — steps 1–2 above, not the configured default), and
+`KITE_ACCESS_TOKEN` or `KITE_API_SECRET` is also set in the environment, the
+command refuses rather than letting the environment variable silently
+override the named profile's own stored credentials. This is the guard
+against accidentally running a command against the wrong account because an
+ambient env var meant for scripting was left set.
 
 ## See also
 

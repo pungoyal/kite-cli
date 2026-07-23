@@ -9,7 +9,7 @@ import {
   safeCompare,
   verifyPostbackChecksum,
 } from '../src/core/auth.js';
-import { endpointsFor } from '../src/core/config.js';
+import { ENDPOINTS } from '../src/core/config.js';
 import { ExitCode } from '../src/core/errors.js';
 import { parseCsv, parseInstrumentKey, parseInstrumentsCsv } from '../src/core/instruments.js';
 import { configDir, credentialsFile } from '../src/core/paths.js';
@@ -81,29 +81,13 @@ describe('login URL', () => {
     const url = new URL(
       buildLoginUrl({
         apiKey: 'key123',
-        endpoints: endpointsFor('production'),
+        endpoints: ENDPOINTS,
         state: 'abc123',
       }),
     );
     expect(url.searchParams.get('v')).toBe('3');
     expect(url.searchParams.get('api_key')).toBe('key123');
     expect(url.searchParams.get('redirect_params')).toBe('state=abc123');
-  });
-
-  it('points at the sandbox host in sandbox mode', () => {
-    const url = buildLoginUrl({
-      apiKey: 'sandboxdemo',
-      endpoints: endpointsFor('sandbox'),
-      state: 'x',
-    });
-    expect(url).toContain('sandbox.kite.trade');
-  });
-});
-
-describe('sandbox endpoints', () => {
-  it('prefixes routes with /oms, which production does not', () => {
-    expect(endpointsFor('sandbox').routePrefix).toBe('/oms');
-    expect(endpointsFor('production').routePrefix).toBe('');
   });
 });
 

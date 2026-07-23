@@ -202,9 +202,6 @@ function renderPreview(ctx: Context, opts: ConfirmOptions, force = false): void 
   for (const detail of opts.details) {
     emit(`  ${io.dim(detail.label.padEnd(width))}  ${detail.value}`);
   }
-  if (ctx.env === 'sandbox') {
-    emit(`  ${io.cyan('sandbox — no real money involved')}`);
-  }
 }
 
 /** The verified identity behind this invocation, with the profile for context. */

@@ -95,7 +95,6 @@ async function mcp(ctx: Context): Promise<void> {
   });
 
   ctx.io.info('kite MCP server ready on stdio (read-only). Launch this from an MCP client; Ctrl-C to stop.');
-  if (ctx.env === 'sandbox') ctx.io.info('Running against the sandbox — no real account.');
 
   // stdio is the transport: the process's own stdin/stdout carry JSON-RPC.
   await server.serve(process.stdin, process.stdout);

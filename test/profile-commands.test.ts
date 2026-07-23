@@ -44,7 +44,6 @@ beforeEach(async () => {
   await rm(configDir(), { recursive: true, force: true });
   await rm(cacheDir(), { recursive: true, force: true });
   delete process.env['KITE_PROFILE'];
-  delete process.env['KITE_ENV'];
 });
 
 afterEach(async () => {
@@ -63,14 +62,12 @@ function json<T = Record<string, unknown>>(): T {
 }
 
 describe('profiles add', () => {
-  it('registers a new profile, honouring the (global) --env flag', async () => {
-    // --env is a global option that Commander routes past the subcommand, so a
-    // non-default value here proves the flag is not silently dropped.
-    const code = await invoke(['profiles', 'add', 'spouse', '--api-key', 'spousekey', '--env', 'sandbox']);
+  it('registers a new profile', async () => {
+    const code = await invoke(['profiles', 'add', 'spouse', '--api-key', 'spousekey']);
     expect(code).toBe(ExitCode.Ok);
 
     const config = await loadConfig();
-    expect(config.profiles.spouse).toEqual({ apiKey: 'spousekey', env: 'sandbox' });
+    expect(config.profiles.spouse).toEqual({ apiKey: 'spousekey' });
   });
 
   it('stores a per-profile order-value cap as a trading override', async () => {
@@ -88,7 +85,7 @@ describe('profiles add', () => {
   });
 
   it('refuses a reserved profile name', async () => {
-    const code = await invoke(['profiles', 'add', 'sandbox']);
+    const code = await invoke(['profiles', 'add', 'default']);
     expect(code).toBe(ExitCode.Usage);
     expect(err).toMatch(/reserved/i);
   });
@@ -98,11 +95,6 @@ describe('profiles add', () => {
     const code = await invoke(['profiles', 'add', 'spouse', '--api-key', 'k']);
     expect(code).toBe(ExitCode.Usage);
     expect(err).toMatch(/already exists/i);
-  });
-
-  it('rejects an unknown environment', async () => {
-    const code = await invoke(['profiles', 'add', 'spouse', '--env', 'staging']);
-    expect(code).toBe(ExitCode.Usage);
   });
 
   it('rejects a non-positive order-value cap', async () => {
@@ -136,7 +128,6 @@ describe('profiles remove', () => {
     await invoke(['profiles', 'add', 'spouse', '--api-key', 'k']);
     await saveSessionMeta({
       userId: 'CD5678',
-      env: 'production',
       apiKey: 'k',
       profile: 'spouse',
       expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
@@ -199,20 +190,19 @@ describe('profiles current / list', () => {
     expect(code).toBe(ExitCode.Ok);
     expect(json()).toMatchObject({
       profile: 'default',
-      env: 'production',
       logged_in: false,
       user_id: null,
     });
   });
 
-  it('lists reserved profiles first, then configured ones', async () => {
+  it('lists the reserved profile first, then configured ones', async () => {
     await invoke(['profiles', 'add', 'spouse', '--api-key', 'k']);
     out = '';
 
     const code = await invoke(['--json', 'profiles', 'list']);
     expect(code).toBe(ExitCode.Ok);
     const names = json<Array<{ profile: string }>>().map((row) => row.profile);
-    expect(names.slice(0, 2)).toEqual(['default', 'sandbox']);
+    expect(names[0]).toBe('default');
     expect(names).toContain('spouse');
   });
 });
@@ -256,7 +246,7 @@ describe('whoami is profile-aware', () => {
     const code = await invoke(['--json', 'whoami', '--all']);
     expect(code).toBe(ExitCode.Ok);
     const names = json<Array<{ profile: string }>>().map((row) => row.profile);
-    expect(names.slice(0, 2)).toEqual(['default', 'sandbox']);
+    expect(names[0]).toBe('default');
     expect(names).toContain('spouse');
   });
 });
@@ -269,7 +259,6 @@ describe('logout clears the resolved profile', () => {
     process.env['KITE_CREDENTIALS_PASSPHRASE'] = 'test-passphrase';
     await saveSessionMeta({
       userId: 'AB1234',
-      env: 'production',
       apiKey: 'legacykey',
       profile: 'default',
       expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
@@ -289,10 +278,9 @@ describe('whoami reflects the verified account when logged in', () => {
   // the active `profile` alongside it.
   it('nests the account object and names the profile', async () => {
     process.env['KITE_CREDENTIALS_PASSPHRASE'] = 'test-passphrase';
-    await saveConfig({ ...defaultConfig(), apiKey: 'legacykey', env: 'production' });
+    await saveConfig({ ...defaultConfig(), apiKey: 'legacykey' });
     await saveSessionMeta({
       userId: 'AB1234',
-      env: 'production',
       apiKey: 'legacykey',
       profile: 'default',
       expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
@@ -341,14 +329,12 @@ describe('a tighter per-profile cap actually bites on a real order', () => {
     await saveConfig({
       ...defaultConfig(),
       apiKey: 'legacykey',
-      env: 'production',
       trading: { ...defaultConfig().trading, maxOrderValue: 100_000 },
-      profiles: { spouse: { apiKey: 'spousekey', env: 'production', trading: { maxOrderValue: 5_000 } } },
+      profiles: { spouse: { apiKey: 'spousekey', trading: { maxOrderValue: 5_000 } } },
     });
     const future = new Date(Date.now() + 86_400_000).toISOString();
     await saveSessionMeta({
       userId: 'AB1234',
-      env: 'production',
       apiKey: 'legacykey',
       profile: 'default',
       expiresAt: future,
@@ -357,7 +343,6 @@ describe('a tighter per-profile cap actually bites on a real order', () => {
     });
     await saveSessionMeta({
       userId: 'CD5678',
-      env: 'production',
       apiKey: 'spousekey',
       profile: 'spouse',
       expiresAt: future,

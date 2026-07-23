@@ -60,7 +60,6 @@ async function doctor(ctx: Context): Promise<void> {
     ctx.io.writeJson({
       ok: worst !== 'fail',
       profile: ctx.profile.name,
-      env: ctx.env,
       checks: checks.map((c) => ({
         name: c.name,
         status: c.status,
@@ -148,9 +147,6 @@ async function checkKeyring(): Promise<Check> {
 }
 
 async function checkCredentials(ctx: Context): Promise<Check> {
-  if (ctx.env === 'sandbox') {
-    return { name: 'API secret', status: 'ok', detail: 'using the public sandbox credentials' };
-  }
   const secret = await getSecret('api_secret', { scope: ctx.credentialScope });
   return secret
     ? { name: 'API secret', status: 'ok', detail: `stored (${secret.backend})` }

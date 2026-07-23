@@ -50,7 +50,6 @@ async function showConfig(ctx: Context): Promise<void> {
       ['Profile', ctx.profile.name === 'default' ? ctx.profile.name : io.bold(ctx.profile.name)],
       ['API key', ctx.profile.apiKey || io.dim('not set')],
       ['API secret', secret ? `${maskSecret(secret.value)} (${secret.backend})` : io.dim('not set')],
-      ['Environment', ctx.profile.env === 'sandbox' ? io.cyan('sandbox') : 'production'],
       [
         'Keyring',
         (await keyringAvailable()) ? io.green('available') : io.yellow('unavailable — using an encrypted file'),
@@ -71,7 +70,7 @@ async function showConfig(ctx: Context): Promise<void> {
   const others = Object.keys(config.profiles);
   if (others.length > 0) {
     io.line(heading(io, 'Profiles'));
-    io.line(renderKeyValue(io, [['Configured', ['default', 'sandbox', ...others].join(', ')]]));
+    io.line(renderKeyValue(io, [['Configured', ['default', ...others].join(', ')]]));
     io.note(io.dim('  Manage them with `kite profiles`.'));
   }
 
@@ -220,7 +219,7 @@ async function showPaths(ctx: Context): Promise<void> {
 
 /** Keys that mean something per profile; the rest are global (output, callback). */
 function isProfileScopedKey(key: string): boolean {
-  return key === 'apiKey' || key === 'env' || key.startsWith('trading.');
+  return key === 'apiKey' || key.startsWith('trading.');
 }
 
 /** Coerce an argv string to the type the setting declares. */

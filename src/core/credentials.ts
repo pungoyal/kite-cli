@@ -117,9 +117,9 @@ function filePassphrase(): string | null {
 
 /**
  * Name the keyring entry / file key for a secret by prepending the profile's
- * storage prefix. The prefix ('' for default, 'sandbox:', 'profile:<name>:') is
- * computed by `storagePrefixFor` in profiles.ts and passed in, so this module
- * stays unaware of the profile model — and the default profile keeps the exact
+ * storage prefix. The prefix ('' for default, 'profile:<name>:') is computed
+ * by `storagePrefixFor` in profiles.ts and passed in, so this module stays
+ * unaware of the profile model — and the default profile keeps the exact
  * unprefixed keys the single-account CLI has always written.
  */
 function scopedKey(name: SecretName, scope: string): string {
@@ -127,7 +127,7 @@ function scopedKey(name: SecretName, scope: string): string {
 }
 
 export interface CredentialStoreOptions {
-  /** Profile storage prefix, e.g. '' (default), 'sandbox:', 'profile:<name>:'. */
+  /** Profile storage prefix, e.g. '' (default), 'profile:<name>:'. */
   scope: string;
   /** Passphrase for the file backend when the keyring is unavailable. */
   passphrase?: string | undefined;

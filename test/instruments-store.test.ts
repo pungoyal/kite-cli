@@ -32,7 +32,7 @@ function fakeApi(csv = CSV): KiteApi {
 }
 
 async function buildStore(csv = CSV): Promise<InstrumentStore> {
-  const store = new InstrumentStore(fakeApi(csv), 'teststore');
+  const store = new InstrumentStore(fakeApi(csv));
   await store.load({ force: true });
   return store;
 }

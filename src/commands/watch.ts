@@ -105,9 +105,6 @@ async function watch(
     apiKey: ctx.client.apiKey,
     accessToken: stored.value,
     endpoints: ctx.endpoints,
-    // The sandbox socket will not authenticate without a user_id, which the
-    // official SDKs do not send.
-    userId: ctx.env === 'sandbox' ? ctx.session?.userId : undefined,
   });
 
   // --- JSON mode: stream NDJSON, no dashboard ----------------------------

@@ -51,7 +51,6 @@ describe('loadSessionMeta tolerates a broken file', () => {
 describe('timeUntilExpiry', () => {
   const at = (expiresAt: string): SessionMeta => ({
     userId: 'AB1234',
-    env: 'production',
     apiKey: 'k',
     expiresAt,
     exchanges: [],

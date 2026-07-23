@@ -21,32 +21,21 @@ function config(over: Partial<Config> = {}): Config {
 }
 
 beforeEach(() => {
-  // resolveProfile reads these directly; a developer shell must not leak in.
+  // resolveProfile reads this directly; a developer shell must not leak in.
   delete process.env['KITE_PROFILE'];
-  delete process.env['KITE_ENV'];
 });
 
 afterEach(() => {
   delete process.env['KITE_PROFILE'];
-  delete process.env['KITE_ENV'];
 });
 
 describe('storage prefix (back-compat is the whole point)', () => {
-  it('leaves the default production profile unprefixed, as before', () => {
-    expect(storagePrefixFor({ name: 'default', env: 'production' })).toBe('');
-  });
-
-  it('keeps the sandbox namespace the single-account CLI used', () => {
-    expect(storagePrefixFor({ name: 'sandbox', env: 'sandbox' })).toBe('sandbox:');
-  });
-
-  it('maps a default profile pinned to sandbox onto the same sandbox namespace', () => {
-    // A user whose config.env is sandbox kept their secrets under `sandbox:`.
-    expect(storagePrefixFor({ name: 'default', env: 'sandbox' })).toBe('sandbox:');
+  it('leaves the default profile unprefixed, as before', () => {
+    expect(storagePrefixFor({ name: 'default' })).toBe('');
   });
 
   it('gives every other profile a collision-proof namespace', () => {
-    expect(storagePrefixFor({ name: 'spouse', env: 'production' })).toBe('profile:spouse:');
+    expect(storagePrefixFor({ name: 'spouse' })).toBe('profile:spouse:');
   });
 });
 
@@ -54,15 +43,6 @@ describe('profile resolution precedence', () => {
   it('falls back to the reserved default with no flags or config', () => {
     const p = resolveProfile({}, config());
     expect(p.name).toBe('default');
-    expect(p.env).toBe('production');
-    expect(p.explicit).toBe(false);
-  });
-
-  it('treats --env sandbox as an alias for the sandbox profile, not an explicit account', () => {
-    const p = resolveProfile({ envFlag: 'sandbox' }, config());
-    expect(p.name).toBe('sandbox');
-    expect(p.env).toBe('sandbox');
-    // Not explicit: the env-var guard must not fire on the legacy alias.
     expect(p.explicit).toBe(false);
   });
 
@@ -79,46 +59,20 @@ describe('profile resolution precedence', () => {
   });
 
   it('uses the configured default profile when nothing is named', () => {
-    const c = config({ defaultProfile: 'huf', profiles: { huf: { apiKey: 'k', env: 'production' } } });
+    const c = config({ defaultProfile: 'huf', profiles: { huf: { apiKey: 'k' } } });
     expect(resolveProfile({}, c).name).toBe('huf');
-  });
-
-  it('lets an explicit --env override the resolved profile environment', () => {
-    // config.env pins the default profile to sandbox; --env production forces it back.
-    const c = config({ env: 'sandbox' });
-    expect(resolveProfile({}, c).env).toBe('sandbox');
-    expect(resolveProfile({ envFlag: 'production' }, c).env).toBe('production');
-  });
-
-  it('rejects an unknown --env', () => {
-    expect(() => resolveProfile({ envFlag: 'staging' }, config())).toThrow(/unknown environment/i);
-  });
-
-  it('uses the public sandbox key for a default profile pinned to sandbox via config', () => {
-    // The persisted-sandbox path (config.env = sandbox, no --env flag): the key
-    // must be the demo key, not the empty/production config apiKey.
-    const p = resolveProfile({}, config({ env: 'sandbox', apiKey: 'prodkey' }));
-    expect(p.name).toBe('default');
-    expect(p.env).toBe('sandbox');
-    expect(p.apiKey).toBe('sandboxdemo');
   });
 });
 
 describe('getProfile', () => {
-  it('returns the public sandbox credentials for the sandbox profile', () => {
-    const p = getProfile(config(), 'sandbox');
-    expect(p.env).toBe('sandbox');
-    expect(p.apiKey).toBe('sandboxdemo');
-  });
-
   it('draws the default profile from the top-level config', () => {
-    const p = getProfile(config({ apiKey: 'topkey', env: 'production' }), 'default');
+    const p = getProfile(config({ apiKey: 'topkey' }), 'default');
     expect(p.apiKey).toBe('topkey');
   });
 
-  it('synthesises an empty production profile for an unknown name (so login can create it)', () => {
+  it('synthesises an empty profile for an unknown name (so login can create it)', () => {
     const p = getProfile(config(), 'brandnew');
-    expect(p).toMatchObject({ name: 'brandnew', apiKey: '', env: 'production' });
+    expect(p).toMatchObject({ name: 'brandnew', apiKey: '' });
   });
 });
 
@@ -150,9 +104,9 @@ describe('per-profile trading overrides (fail-closed inheritance)', () => {
 });
 
 describe('profile bookkeeping', () => {
-  it('lists reserved profiles first, then configured ones, without duplicates', () => {
+  it('lists the reserved profile first, then configured ones, without duplicates', () => {
     const c = config({ profiles: { huf: {}, spouse: {} } });
-    expect(listProfileNames(c)).toEqual(['default', 'sandbox', 'huf', 'spouse']);
+    expect(listProfileNames(c)).toEqual(['default', 'huf', 'spouse']);
   });
 
   it('rejects names that could escape a filename', () => {
@@ -169,8 +123,8 @@ describe('scoped credential storage keeps profiles isolated', () => {
   it('stores and reads each profile token under its own namespace', async () => {
     process.env['KITE_CREDENTIALS_PASSPHRASE'] = 'test-passphrase';
 
-    const defaultScope = storagePrefixFor({ name: 'default', env: 'production' });
-    const spouseScope = storagePrefixFor({ name: 'spouse', env: 'production' });
+    const defaultScope = storagePrefixFor({ name: 'default' });
+    const spouseScope = storagePrefixFor({ name: 'spouse' });
     expect(defaultScope).not.toBe(spouseScope);
 
     await setSecret('access_token', 'token-default', { scope: defaultScope });

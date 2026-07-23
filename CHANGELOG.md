@@ -8,6 +8,28 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Removed
+
+- **Sandbox support (`--env`/`KITE_ENV`, the reserved `sandbox` profile) is
+  gone.** Zerodha's Kite Connect sandbox turns out to be undocumented beyond
+  a login form — `sandbox.kite.trade` is live, but neither Zerodha's own docs
+  nor the developer forum say what identity to authenticate with, and it is
+  not the same as your regular Zerodha login. Since the CLI could never
+  actually complete a sandbox login, the entire environment concept (config
+  `env`, `--env` flag, `endpointsFor`, `SANDBOX_CREDENTIALS`, the `/oms`
+  route-prefix plumbing, the sandbox-only `user_id` WebSocket parameter, and
+  the per-environment instrument cache) has been removed rather than kept
+  around unused. `--dry-run` remains the supported way to preview an order
+  without sending it.
+  - **Breaking for library consumers:** `endpointsFor`, `type Environment`,
+    `SANDBOX_CREDENTIALS`, and `SANDBOX_PROFILE` are no longer exported from
+    the package root. `KiteClient`/`Ticker`'s `endpoints` option now takes the
+    new `ENDPOINTS` constant instead of `endpointsFor('production' | 'sandbox')`.
+  - **Breaking for CLI users:** the global `--env`/`KITE_ENV` flag, the
+    `sandbox` profile, `kite profiles add --env`, and the `config.env` /
+    per-profile `env` config keys are gone. A config file or session with a
+    leftover `env` key still loads fine (the field is just ignored).
+
 ## [0.5.0] - 2026-07-22
 
 ### Added

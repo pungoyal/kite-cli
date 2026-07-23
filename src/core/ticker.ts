@@ -240,8 +240,6 @@ export interface TickerOptions {
   apiKey: string;
   accessToken: string;
   endpoints: Endpoints;
-  /** Required by the sandbox WebSocket, which the official SDKs omit. */
-  userId?: string | undefined;
   maxRetries?: number;
   maxReconnectDelayMs?: number;
   /** Force a reconnect if no data (including heartbeats) arrives for this long. */
@@ -265,9 +263,7 @@ export const MAX_CONNECTIONS_PER_KEY = 3;
 
 export class Ticker extends EventEmitter<TickerEvents> {
   private ws: WebSocket | undefined;
-  private readonly opts: Required<Omit<TickerOptions, 'userId'>> & {
-    userId?: string | undefined;
-  };
+  private readonly opts: Required<TickerOptions>;
 
   /** Desired subscription state, replayed on every reconnect. */
   private readonly subscriptions = new Set<number>();
@@ -284,7 +280,6 @@ export class Ticker extends EventEmitter<TickerEvents> {
       apiKey: options.apiKey,
       accessToken: options.accessToken,
       endpoints: options.endpoints,
-      userId: options.userId,
       maxRetries: options.maxRetries ?? 50,
       maxReconnectDelayMs: options.maxReconnectDelayMs ?? 60_000,
       readTimeoutMs: options.readTimeoutMs ?? 10_000,
@@ -295,8 +290,6 @@ export class Ticker extends EventEmitter<TickerEvents> {
     const url = new URL(this.opts.endpoints.ws);
     url.searchParams.set('api_key', this.opts.apiKey);
     url.searchParams.set('access_token', this.opts.accessToken);
-    // The sandbox ticker will not authenticate without this; production ignores it.
-    if (this.opts.userId) url.searchParams.set('user_id', this.opts.userId);
     return url.toString();
   }
 

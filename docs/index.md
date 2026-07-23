@@ -51,15 +51,21 @@ reference behind it.
 
 ## Try it before you trust it
 
-It moves real money, so convince yourself first. Zerodha runs a public sandbox with
-fake money and no subscription:
+It moves real money, so convince yourself first. Every order command supports
+`--dry-run`, which resolves and previews the order — the actual contract, lot
+size, and computed value — without sending anything to Kite:
 
 ```bash
-kite login --env sandbox
-kite --env sandbox holdings
-kite --env sandbox orders place NSE:INFY --side BUY --quantity 1 --dry-run
+kite login
+kite holdings
+kite orders place NSE:INFY --side BUY --quantity 1 --dry-run
 ```
 
-Every command behaves exactly as it does against a real account. And because the
-package is published only from CI via [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/),
-you can verify the build provenance yourself with `npm audit signatures`.
+There is no sandbox environment to fall back to — Zerodha's own Kite Connect
+sandbox is undocumented beyond a login form, so this CLI does not integrate
+with it (see [CHANGELOG](https://github.com/pungoyal/kite-cli/blob/main/CHANGELOG.md)).
+`--dry-run` and the confirmation preview on every money-moving command are the
+supported way to rehearse a command before it touches your real account. And
+because the package is published only from CI via
+[npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/), you can
+verify the build provenance yourself with `npm audit signatures`.

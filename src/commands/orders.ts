@@ -300,12 +300,6 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
   if (variety === 'iceberg' && (opts.icebergLegs === undefined || opts.icebergQuantity === undefined)) {
     throw new UsageError('--iceberg-legs and --iceberg-quantity are required for an iceberg order.');
   }
-  if (ctx.env === 'sandbox' && orderType === 'MARKET') {
-    throw new UsageError(
-      'The sandbox does not accept MARKET orders.',
-      'Use --type LIMIT with a price near the last traded price.',
-    );
-  }
 
   // --- resolve the instrument so the preview shows what will really trade ---
   await ctx.instruments.load({ signal: ctx.signal }).catch(() => {

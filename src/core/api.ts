@@ -524,8 +524,6 @@ export class KiteApi {
   async getInstrumentsCsv(exchange?: string, signal?: AbortSignal): Promise<string> {
     return this.client.requestText({
       path: exchange ? `/instruments/${exchange}` : '/instruments',
-      // /instruments is the one route the sandbox does NOT serve under /oms.
-      noPrefix: true,
       signal,
     });
   }

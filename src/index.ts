@@ -24,10 +24,8 @@ export {
   setDispatcher,
 } from './core/client.js';
 export {
+  ENDPOINTS,
   type Endpoints,
-  type Environment,
-  endpointsFor,
-  SANDBOX_CREDENTIALS,
 } from './core/config.js';
 export {
   AuthRequiredError,
@@ -55,7 +53,6 @@ export {
   type ResolvedProfile,
   resolveProfile,
   resolveTradingConfig,
-  SANDBOX_PROFILE,
   storagePrefixFor,
 } from './core/profiles.js';
 export {

@@ -2,7 +2,7 @@ import { MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KiteApi } from '../src/core/api.js';
 import { KiteClient, setDispatcher } from '../src/core/client.js';
-import { endpointsFor } from '../src/core/config.js';
+import { ENDPOINTS } from '../src/core/config.js';
 import { RateLimiter } from '../src/core/ratelimit.js';
 
 /**
@@ -36,7 +36,7 @@ function api(accessToken = 'testtoken'): KiteApi {
     new KiteClient({
       apiKey: 'testkey',
       accessToken,
-      endpoints: endpointsFor('production'),
+      endpoints: ENDPOINTS,
       limiter: new RateLimiter(),
     }),
   );
