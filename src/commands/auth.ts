@@ -232,7 +232,6 @@ async function callbackFlow(ctx: Context, loginUrl: string): Promise<string> {
   try {
     const result = await Promise.race([server.promise, interrupted, wantsManual]);
     if (result === 'manual') {
-      io.note('');
       return await manualFlow(ctx, loginUrl);
     }
     return result.requestToken;
@@ -324,15 +323,20 @@ async function manualFlow(ctx: Context, loginUrl: string): Promise<string> {
   if (!input) throw new AbortedError();
 
   const parsed = parseRequestTokenInput(input);
+  registerSecret(parsed.requestToken);
+
+  // Only a pasted full URL carries `state`; a bare token has nothing to check
+  // it against. That's a known gap, not a hole: Kite's own token exchange
+  // still binds `request_token` to the api_key/checksum that issued it, so a
+  // token from a different login attempt fails there regardless of this check.
   if (parsed.state !== null && !safeCompare(parsed.state, expectedState)) {
     throw new KiteCliError(
       'That redirect URL is from a different login attempt (CSRF state mismatch).',
       ExitCode.Auth,
-      'Run `kite login --manual` again, and paste the URL from that same attempt.',
+      'Run `kite login` again, and paste the URL from that same attempt.',
     );
   }
 
-  registerSecret(parsed.requestToken);
   return parsed.requestToken;
 }
 
