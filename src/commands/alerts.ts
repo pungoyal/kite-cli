@@ -812,6 +812,15 @@ async function setAlertStatus(
     // Re-enabling an ato alert restores its ability to place a real order when
     // it fires, and disabling one is a change to that same order-triggering
     // config — gate both behind the trading guard rails, as for `modify`.
+    //
+    // Deliberately no `increasesExposure`/`notionalValue` here: the basket was
+    // already priced and value-capped at `create` time. Re-checking it against
+    // today's cap on `enable` would mean re-quoting every leg (the same work
+    // `buildAtoBasket` does at creation) just to toggle a status flag — real
+    // scope, not a one-line addition. The gap this leaves: if `maxOrderValue`
+    // was tightened after the alert was created, `enable` can still re-arm a
+    // basket that now exceeds it. Left as a known limitation rather than
+    // silently "fixed" with an unpriced check.
     mutatesOrders: params.type === 'ato',
     details: [
       { label: 'UUID', value: uuid },
@@ -872,8 +881,17 @@ async function deleteAlerts(ctx: Context, _opts: unknown, command: { args: strin
     ctx.io.warn('Could not read your alerts from Kite; the details below are unverified.');
   }
 
+  // Deleting an `ato` alert cancels a live order-arming trigger — the same
+  // kill-switch gate `enable`/`disable` and `orders cancel`/`gtt delete` apply
+  // to their own unwind actions, despite all of them reducing risk rather than
+  // increasing it. A `simple` alert moves no money and stays ungated, matching
+  // `create`/`modify`/`enable`/`disable`. An alert we could not verify is
+  // treated as though it might be `ato` — fail closed, not "assume simple".
+  const mayBeAto = uuids.some((uuid) => known.get(uuid)?.type === 'ato' || !known.has(uuid));
+
   await confirmAction(ctx, {
     action: uuids.length === 1 ? `Delete alert ${uuids[0]}` : `Delete ${uuids.length} alerts`,
+    mutatesOrders: mayBeAto,
     details: uuids.map((uuid) => {
       const alert = known.get(uuid);
       return {
