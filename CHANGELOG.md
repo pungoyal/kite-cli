@@ -23,6 +23,29 @@ While the version is `0.x`, minor releases may contain breaking changes.
   too, with nothing to keep in sync. `gtt place` and `alerts create` also gain a
   short note on their two mutually exclusive shapes.
 
+- **A scripting and automation reference**, at
+  [docs/scripting.md](docs/scripting.md): the stdout/stderr contract, what
+  `--json` guarantees (including `watch`'s NDJSON), the full exit-code table,
+  how `--yes` and the non-interactive refusal interact, why a script reconciles
+  by tag instead of retrying a write, credentials in CI, and colour/TTY
+  environment variables.
+
+  The exit-code table previously lived only in the README, which meant the
+  library API page, the troubleshooting guide and the generated command
+  reference all linked *out* of the docs site to find it. Those are now in-site
+  links, so a rename fails the docs build instead of rotting silently.
+
+### Changed
+
+- **The README is an introduction again, not a second copy of the reference.**
+  It had grown a full config-key table, the multi-account walkthrough and
+  per-command prose for alerts, GTT and margins — all of it duplicated on the
+  documentation site, where it is searchable and versioned with the code. What
+  remains is what a reader needs before trusting the tool: why it is safe, how
+  it compares to the official SDKs, install, login, and one everyday-commands
+  block. Every heading the docs pages link into is kept, trimmed to a short
+  section with a pointer.
+
 ### Fixed
 
 - **`kite --help` and the README documented the wrong JSON shape for
