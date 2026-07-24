@@ -68,11 +68,18 @@ npm run docs:dev      # install docs deps + serve with hot reload
 npm run docs:build    # production build (what CI deploys)
 ```
 
-Editing a `docs/*.md` page and pushing to `main` triggers the `Docs` workflow,
-which builds the site and deploys it to GitHub Pages. Links from a docs page to
-source files or README sections use absolute `github.com` URLs (they live
-outside the site); links between docs pages stay as relative `*.md` paths so
-they resolve both in the rendered site and when browsing `docs/` on GitHub.
+The `Docs` workflow builds the site on every pull request and every push to
+`main` as a validation gate — `vitepress build` fails on a dead in-site link —
+but **deploys only on a `v*` release tag**. The published site therefore matches
+the published package: `docs/commands.md` is generated from `--help`, so
+deploying from `main` would advertise flags that `npm i -g @pungoyal/kite-cli`
+does not yet ship. To publish a documentation fix between releases, run the
+workflow by hand (**Actions → Docs → Run workflow**, from `main`).
+
+Links from a docs page to source files or README sections use absolute
+`github.com` URLs (they live outside the site); links between docs pages stay as
+relative `*.md` paths so they resolve both in the rendered site and when
+browsing `docs/` on GitHub.
 
 Formatting and linting are handled by [Biome](https://biomejs.dev) (config in
 `biome.json`): 2-space indent, single quotes, semicolons, trailing commas,
@@ -144,7 +151,9 @@ To cut a release:
    ```
 5. The tag push triggers the release workflow, which re-runs typecheck, tests and
    build, asserts the shebang survived, validates the package shape, checks that
-   the tag matches `package.json`, and then publishes with provenance.
+   the tag matches `package.json`, and then publishes with provenance. The same
+   tag deploys the documentation site, so the docs and the package go live
+   together.
 
 Verify a published release with:
 

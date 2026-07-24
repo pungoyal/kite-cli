@@ -37,6 +37,15 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ### Changed
 
+- **The documentation site now deploys on a release tag, not on every push to
+  `main`.** `docs/commands.md` is generated from the CLI's own `--help`, so
+  deploying from `main` published flags and behaviour that the released package
+  did not ship yet — the same docs-rot this project guards against, pointing
+  forwards instead of backwards. The site and the npm package now move together
+  on the `v*` tag; pull requests and `main` still build the site as a
+  dead-link gate, and a documentation fix can be published between releases by
+  running the workflow manually.
+
 - **The README is an introduction again, not a second copy of the reference.**
   It had grown a full config-key table, the multi-account walkthrough and
   per-command prose for alerts, GTT and margins — all of it duplicated on the
