@@ -1,10 +1,10 @@
 # Configuration reference
 
 This is the exhaustive reference for every config key and environment
-variable the CLI reads. For a quick-start table and the multi-account
-narrative, see the README's [Configuration](https://github.com/pungoyal/kite-cli#configuration) and
-[Multiple accounts](https://github.com/pungoyal/kite-cli#multiple-accounts) sections — this page is
-the superset: every key, every env var, and the precedence between them.
+variable the CLI reads. The README's [Configuration](https://github.com/pungoyal/kite-cli#configuration) and
+[Multiple accounts](https://github.com/pungoyal/kite-cli#multiple-accounts) sections are the
+short version; this page is the superset: every key, every env var, and the
+precedence between them.
 
 Config lives at `~/.config/kite/config.json` (mode `0600`, directory
 `0700`). Inspect and edit it with:
