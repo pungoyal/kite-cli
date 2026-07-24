@@ -1,19 +1,28 @@
 name: Docs
 
-# Builds the VitePress documentation site (docs/) and, on main, deploys it to
-# GitHub Pages. The site is an isolated workspace with its own package.json and
-# lockfile, so it never touches the CLI package's dependency closure.
+# Builds the VitePress documentation site (docs/) and deploys it to GitHub Pages
+# on a release tag. The site is an isolated workspace with its own package.json
+# and lockfile, so it never touches the CLI package's dependency closure.
 #
-# On pull requests the build runs as a validation gate only — `vitepress build`
-# fails on a broken build or a dead internal link (ignoreDeadLinks is off), so
-# regressions are caught before merge. The Pages upload/deploy steps run only on
-# a push to main, where the deployment context and permissions exist.
+# The site documents the *published* version, not main. docs/commands.md is
+# generated from the CLI's own `--help`, so deploying from main would publish
+# flags and behaviour that `npm i -g @pungoyal/kite-cli` does not yet ship — the
+# same docs-rot this repo treats as dangerous, just pointing forwards. Deploys
+# therefore ride the `v*` tag that publishes to npm, so the two move together.
+#
+# On pull requests and on main the build still runs as a validation gate —
+# `vitepress build` fails on a broken build or a dead internal link
+# (ignoreDeadLinks is off), so regressions are caught before merge rather than
+# at release time. `workflow_dispatch` from main is the escape hatch for
+# publishing a documentation fix without cutting a release.
+#
+# `paths` is deliberately absent from `push`: path filters and tag filters
+# interact badly (a tag push carries no meaningful file diff), and the build is
+# a ~20-second job, so it simply runs on every push to main and every tag.
 on:
   push:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
+    tags: ['v*']
   pull_request:
     paths:
       - 'docs/**'
@@ -54,26 +63,27 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: docs
 
-      # The validation gate: fails the check on a broken build or dead link,
-      # on pull requests as well as on main.
+      # The validation gate: fails the check on a broken build or dead link, on
+      # pull requests and on main as well as on the tag that deploys.
       - name: Build
         run: npm run build
         working-directory: docs
 
-      # Pages plumbing is only meaningful on a real deployment, so skip it on
-      # pull requests (which also lack the Pages context/permissions).
+      # Pages plumbing is only meaningful on a real deployment — a tag push or a
+      # manual dispatch. A PR or a plain push to main stops at the build above.
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-        if: github.event_name != 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        if: github.event_name != 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         with:
           path: docs/.vitepress/dist
 
   deploy:
     name: Deploy to Pages
-    # No deploy on pull requests — the build job above is the PR gate.
-    if: github.event_name != 'pull_request'
+    # Only a release tag (or a deliberate manual dispatch) publishes. Everything
+    # else — pull requests, ordinary pushes to main — is a build-only gate.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     permissions:
