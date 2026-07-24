@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import type { Context } from '../context.js';
 import { UsageError } from '../core/errors.js';
+import { examples } from './examples.js';
 import type { CommandFactory, Runner } from './types.js';
 
 /**
@@ -32,6 +33,14 @@ export const completionCommands: CommandFactory = (program, run) => {
         '  fish   kite completion fish > ~/.config/fish/completions/kite.fish',
     )
     .argument('[shell]', 'Target shell: bash, zsh, or fish')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite completion', 'Print a script for the shell in $SHELL'],
+        ['kite completion fish > ~/.config/fish/completions/kite.fish', 'Install for fish'],
+        ['eval "$(kite completion zsh)"', 'Load into the current zsh session'],
+      ]),
+    )
     .action(run(completion));
 };
 

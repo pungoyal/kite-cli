@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import type { Context } from '../context.js';
 import { McpServer, type McpTool } from '../core/mcp.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -104,5 +105,13 @@ export const mcpCommands: CommandFactory = (program, run) => {
   program
     .command('mcp')
     .description('Run a read-only MCP server over stdio for LLM agents (Claude and others)')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite mcp', 'Usually launched by the client, not typed by hand'],
+        ['claude mcp add kite -- kite mcp', 'Register the server with Claude Code'],
+        ['kite --profile huf mcp', 'Serve a specific account'],
+      ]),
+    )
     .action(run(mcp));
 };

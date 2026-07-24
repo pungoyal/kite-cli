@@ -6,6 +6,7 @@ import { ExitCode } from '../core/errors.js';
 import { configFile } from '../core/paths.js';
 import { isExpired, timeUntilExpiry } from '../core/session.js';
 import { renderKeyValue } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -37,6 +38,14 @@ export const doctorCommands: CommandFactory = (program, run) => {
   program
     .command('doctor')
     .description('Run offline health checks on your configuration, credentials, and session')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite doctor', 'Check config, credentials, session and caches'],
+        ['kite doctor --json', 'Machine-readable checks, for a health probe'],
+        ['kite --profile huf doctor', 'Check another account'],
+      ]),
+    )
     .action(run(doctor));
 };
 

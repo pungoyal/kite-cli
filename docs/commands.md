@@ -2,8 +2,9 @@
 
 # Command reference
 
-Every command, flag, and subcommand exactly as `--help` prints it. Run
-`npm run docs:commands` to regenerate after adding or changing a command.
+Every command, flag, and subcommand exactly as `--help` prints it, worked
+examples included. Run `npm run docs:commands` to regenerate after adding or
+changing a command.
 
 ## Global flags and environment variables
 
@@ -88,7 +89,7 @@ Examples:
   $ kite history NSE:INFY -i 5minute --from 7d  Recent 5-minute candles
   $ kite orders place NSE:INFY -s BUY -q 1 --dry-run
                                                 Preview an order without sending it
-  $ kite positions --json | jq '.net[].pnl'     Machine-readable output
+  $ kite positions --json | jq '.[].pnl'        Machine-readable output
   $ kite --profile huf holdings                 Run against another account (kite profiles)
 
 Safety:
@@ -113,6 +114,13 @@ Options:
   --api-key <key>  Kite Connect API key (prompted for if absent)
   --force          Log in again even if the current session is still valid
   -h, --help       display help for command
+
+Examples:
+  $ kite login                             Open a browser and store the session
+  $ kite login --manual                    Paste the request token by hand (headless/SSH)
+  $ kite login --api-key abcd1234efgh5678  Use a specific API key instead of the stored one
+  $ kite login --force                     Re-authenticate even if the session is still valid
+  $ kite --profile huf login               Log in to another account (see `kite profiles`)
 ```
 
 ## `kite logout`
@@ -125,6 +133,11 @@ Invalidate the session and remove the stored access token
 Options:
   --all       Also remove the stored API secret
   -h, --help  display help for command
+
+Examples:
+  $ kite logout                Forget the access token, keep the API secret
+  $ kite logout --all          Also forget the API secret — a full login next time
+  $ kite --profile huf logout  Log out of one profile only
 ```
 
 ## `kite whoami`
@@ -137,6 +150,11 @@ Show the current session and account details
 Options:
   --all       List every configured profile and its session status
   -h, --help  display help for command
+
+Examples:
+  $ kite whoami                                  Verify which account this session belongs to
+  $ kite whoami --all                            Session status for every configured profile
+  $ kite whoami --json | jq -r .account.user_id  Just the Kite user id
 ```
 
 ## `kite profiles`
@@ -156,6 +174,14 @@ Commands:
   use <name>            Set the default profile for future commands
   current               Show the profile this invocation resolves to
   help [command]        display help for command
+
+Examples:
+  $ kite profiles                List profiles and their session status
+  $ kite profiles add huf --api-key abcd1234efgh5678
+      Register a second account
+  $ kite --profile huf login     Log in to it (each profile has its own session)
+  $ kite --profile huf holdings  Run any command against it
+  $ kite profiles use huf        Make it the default for future commands
 ```
 
 ### `kite profiles list`
@@ -167,6 +193,10 @@ List configured profiles and their session status
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite profiles list       Every profile, with which one is the default
+  $ kite profiles ls --json  Machine-readable listing
 ```
 
 ### `kite profiles add`
@@ -183,6 +213,14 @@ Options:
   --api-key <key>             Kite Connect API key for this account
   --max-order-value <rupees>  Per-profile cap on any single order
   -h, --help                  display help for command
+
+Examples:
+  $ kite profiles add huf
+      Prompt for the API key
+  $ kite profiles add huf --api-key abcd1234efgh5678
+      Supply it up front
+  $ kite profiles add huf --max-order-value 50000
+      Cap any single order on this account at ₹50,000
 ```
 
 ### `kite profiles remove`
@@ -194,6 +232,9 @@ Delete a profile and its stored credentials
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite profiles remove huf  Delete the profile, its API key and its session
 ```
 
 ### `kite profiles use`
@@ -205,6 +246,10 @@ Set the default profile for future commands
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite profiles use huf      Commands without --profile now run against huf
+  $ kite profiles use default  Go back to the unnamed default account
 ```
 
 ### `kite profiles current`
@@ -216,6 +261,10 @@ Show the profile this invocation resolves to
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite profiles current                Which account a bare `kite holdings` would hit
+  $ kite --profile huf profiles current  Check how an explicit --profile resolves
 ```
 
 ## `kite holdings`
@@ -228,6 +277,13 @@ Show your long-term holdings
 Options:
   --sort <field>  Sort by: symbol, value, pnl, day (default: "value")
   -h, --help      display help for command
+
+Examples:
+  $ kite holdings             Everything you hold, largest position first
+  $ kite holdings --sort pnl  Best to worst performer
+  $ kite holdings --sort day  Sort by today's move
+  $ kite holdings --json | jq -r '.[].tradingsymbol'
+      Just the symbols, for scripting
 ```
 
 ## `kite positions`
@@ -240,6 +296,11 @@ Show your open positions
 Options:
   --day       Show intraday positions instead of net
   -h, --help  display help for command
+
+Examples:
+  $ kite positions                        Net positions carried plus today
+  $ kite positions --day                  Only today's intraday positions
+  $ kite positions --json | jq '.[].pnl'  JSON is the array being shown, not {net, day}
 ```
 
 ## `kite funds`
@@ -252,6 +313,11 @@ Show available margin and funds
 Options:
   --segment <segment>  equity or commodity
   -h, --help           display help for command
+
+Examples:
+  $ kite funds                          Equity and commodity margins
+  $ kite funds --segment equity         Equity only
+  $ kite funds --json | jq .equity.net  Cash available to trade
 ```
 
 ## `kite authorise`
@@ -268,6 +334,11 @@ Arguments:
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite authorise                            Authorise the whole demat account
+  $ kite authorise INE009A01021               Authorise one holding by ISIN
+  $ kite authorise INE009A01021 INE467B01029  Authorise several at once
 ```
 
 ## `kite convert`
@@ -287,6 +358,14 @@ Options:
   --transaction-type <type>  BUY or SELL (default: "BUY")
   --position-type <type>     overnight or day (default: "day")
   -h, --help                 display help for command
+
+Examples:
+  $ kite convert NSE:INFY --quantity 10 --from MIS --to CNC
+      Carry an intraday buy forward as delivery
+  $ kite convert NSE:INFY --quantity 10 --from MIS --to CNC --dry-run
+      Preview it first
+  $ kite convert NFO:NIFTY25AUGFUT --quantity 75 --from NRML --to MIS --transaction-type SELL
+      Convert a short futures position to intraday margin
 ```
 
 ## `kite mf`
@@ -304,6 +383,11 @@ Commands:
   orders          Show mutual fund orders from the last 7 days
   sips            Show your mutual fund SIPs
   help [command]  display help for command
+
+Examples:
+  $ kite mf         Your fund holdings (holdings is the default)
+  $ kite mf orders  Purchases and redemptions from the last 7 days
+  $ kite mf sips    Standing instructions and their next instalment
 ```
 
 ### `kite mf holdings`
@@ -315,6 +399,11 @@ Show your mutual fund holdings
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite mf holdings  Units, average cost and current value per fund
+  $ kite mf holdings --json | jq '[.[].pnl] | add'
+      Total unrealised P&L across funds
 ```
 
 ### `kite mf orders`
@@ -326,6 +415,9 @@ Show mutual fund orders from the last 7 days
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite mf orders  Recent purchases and redemptions
 ```
 
 ### `kite mf sips`
@@ -337,6 +429,9 @@ Show your mutual fund SIPs
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite mf sips  Every SIP, its instalment and next due date
 ```
 
 ## `kite quote`
@@ -352,6 +447,13 @@ Arguments:
 Options:
   --depth      Show the full 5-level order book
   -h, --help   display help for command
+
+Examples:
+  $ kite quote NSE:INFY                       Full quote for one instrument
+  $ kite quote NSE:INFY NSE:TCS NSE:HDFCBANK  Several at once (one API call)
+  $ kite quote NSE:INFY --depth               With the 5-level bid/ask book
+  $ kite quote "INDICES:NIFTY 50"             An index — quote a symbol with a space
+  $ kite quote NFO:NIFTY25AUGFUT --json       JSON keyed by EXCHANGE:SYMBOL
 ```
 
 ## `kite ltp`
@@ -366,6 +468,12 @@ Arguments:
 
 Options:
   -h, --help   display help for command
+
+Examples:
+  $ kite ltp NSE:INFY          Last traded price
+  $ kite ltp NSE:INFY NSE:TCS  Several at once
+  $ kite ltp NSE:INFY --json | jq '."NSE:INFY".last_price'
+      One price, for a script
 ```
 
 ## `kite ohlc`
@@ -380,6 +488,11 @@ Arguments:
 
 Options:
   -h, --help   display help for command
+
+Examples:
+  $ kite ohlc NSE:INFY                   Today's open/high/low/close and last price
+  $ kite ohlc NSE:INFY NSE:TCS           Several at once
+  $ kite ohlc "INDICES:NIFTY 50" --json  Index OHLC as JSON
 ```
 
 ## `kite history`
@@ -403,6 +516,16 @@ Options:
   --limit <n>                Show only the last N candles in table view
                              (default: "30")
   -h, --help                 display help for command
+
+Examples:
+  $ kite history NSE:INFY                        Daily candles for the last 30 days
+  $ kite history NSE:INFY -i 5minute --from 7d   Intraday candles for the last week
+  $ kite history NSE:INFY --from 2025-01-01 --to 2025-03-31 --csv > infy.csv
+      A date range, as CSV
+  $ kite history NFO:NIFTY25AUGFUT -i 15minute --oi
+      Futures candles with open interest
+  $ kite history NFO:NIFTY25AUGFUT --continuous  Stitch expired contracts into one series
+  $ kite history NSE:INFY --limit 5              Show only the last 5 candles in the table
 ```
 
 ## `kite instruments`
@@ -419,6 +542,10 @@ Commands:
   search [options] <query>  Search instruments by symbol or name
   refresh                   Re-download the instrument master
   help [command]            display help for command
+
+Examples:
+  $ kite instruments search INFY  Find a tradingsymbol to use elsewhere
+  $ kite instruments refresh      Re-download after expiries or new listings
 ```
 
 ### `kite instruments search`
@@ -436,6 +563,14 @@ Options:
   -t, --type <type>          Filter by instrument type, e.g. EQ, FUT, CE, PE
   -n, --limit <n>            Maximum results (default: "25")
   -h, --help                 display help for command
+
+Examples:
+  $ kite instruments search INFY               Anything matching INFY
+  $ kite instruments search INFY -e NSE -t EQ  Only the NSE equity line
+  $ kite instruments search "nifty bank" -e NFO -t FUT
+      Bank Nifty futures contracts
+  $ kite instruments search NIFTY -e NFO -t CE -n 50
+      Up to 50 call options
 ```
 
 ### `kite instruments refresh`
@@ -447,6 +582,9 @@ Re-download the instrument master
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite instruments refresh  Refresh the cached contract list (run after expiry day)
 ```
 
 ## `kite orders`
@@ -468,6 +606,13 @@ Commands:
   modify [options] <order-id>   Modify a pending order
   cancel [options] <order-id>   Cancel a pending order
   help [command]                display help for command
+
+Examples:
+  $ kite orders                         Today's orderbook
+  $ kite orders place NSE:INFY -s BUY -q 1 --dry-run
+      Preview an order without sending it
+  $ kite orders get 250724000123456     Did it actually execute?
+  $ kite orders cancel 250724000123456  Cancel a working order
 ```
 
 ### `kite orders list`
@@ -480,6 +625,12 @@ Show today's orderbook
 Options:
   --open      Show only orders that are still working
   -h, --help  display help for command
+
+Examples:
+  $ kite orders              Every order placed today (list is the default)
+  $ kite orders list --open  Only orders still working
+  $ kite orders list --open --json | jq -r '.[].order_id'
+      Order ids, for scripting
 ```
 
 ### `kite orders get`
@@ -491,6 +642,10 @@ Show the full state history of one order
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite orders get 250724000123456         Every status this order passed through
+  $ kite orders get 250724000123456 --json  The raw status history
 ```
 
 ### `kite orders reconcile`
@@ -506,6 +661,11 @@ Arguments:
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite orders reconcile                  List every order this CLI tagged today
+  $ kite orders reconcile kc1a2b3c4d5e6f   Did the order with this tag reach Kite?
+  $ kite orders reconcile myhedge9f8e7d6c  Same, for an order placed with --tag myhedge
 ```
 
 ### `kite orders place`
@@ -535,6 +695,26 @@ Options:
   --iceberg-quantity <n>    Quantity per iceberg leg
   --tag <tag>               Custom tag, max 20 alphanumeric characters
   -h, --help                display help for command
+
+Examples:
+  $ kite orders place NSE:INFY -s BUY -q 1 --dry-run
+      Preview the resolved order, send nothing
+  $ kite orders place NSE:INFY -s BUY -q 10
+      Market buy, delivery (CNC is the default)
+  $ kite orders place NSE:INFY -s SELL -q 10 -t LIMIT -p 1650
+      Limit sell at ₹1,650
+  $ kite orders place NSE:INFY -s SELL -q 10 -t SL -p 1595 --trigger-price 1600
+      Stop-loss: triggers at 1600, sells down to 1595
+  $ kite orders place NSE:TCS -s BUY -q 5 --product MIS
+      Intraday, squared off by the broker
+  $ kite orders place NFO:NIFTY25AUGFUT -s BUY -q 75 --product NRML -t LIMIT -p 24500
+      Futures, carried overnight
+  $ kite orders place NSE:INFY -s BUY -q 1000 --variety iceberg --iceberg-legs 5 --iceberg-quantity 200
+      Slice a large order into 5 legs of 200
+  $ kite orders place NSE:INFY -s BUY -q 10 --variety amo
+      After-market order for the next session
+  $ kite orders place NSE:INFY -s BUY -q 10 --tag rebalance
+      Tag it, so `orders reconcile` can find it
 ```
 
 ### `kite orders modify`
@@ -553,6 +733,14 @@ Options:
   --variety <variety>      Order variety (inferred from the orderbook if
                            omitted)
   -h, --help               display help for command
+
+Examples:
+  $ kite orders modify 250724000123456 -p 1655    Chase the price on a working limit order
+  $ kite orders modify 250724000123456 -q 5 -p 1650
+      Change quantity and price together
+  $ kite orders modify 250724000123456 -t MARKET  Give up on the limit and fill at market
+  $ kite orders modify 250724000123456 --trigger-price 1610
+      Move a stop-loss trigger
 ```
 
 ### `kite orders cancel`
@@ -565,6 +753,14 @@ Cancel a pending order
 Options:
   --variety <variety>  Order variety (inferred from the orderbook if omitted)
   -h, --help           display help for command
+
+Examples:
+  $ kite orders cancel 250724000123456
+      Cancel one working order
+  $ kite orders cancel 250724000123456 --variety amo
+      When the variety cannot be inferred
+  $ kite orders list --open --json | jq -r '.[].order_id' | xargs -n1 kite orders cancel -y
+      Cancel everything still working
 ```
 
 ## `kite trades`
@@ -576,6 +772,11 @@ Show today's executed trades
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite trades  Every fill today, with price and time
+  $ kite trades --json | jq '[.[].quantity] | add'
+      Total quantity traded today
 ```
 
 ## `kite gtt`
@@ -594,6 +795,14 @@ Commands:
   place [options] <instrument>  Create a GTT trigger
   delete <id>                   Delete a GTT trigger
   help [command]                display help for command
+
+Examples:
+  $ kite gtt                Your standing triggers
+  $ kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395
+      A single-leg stop, valid for a year
+  $ kite gtt place NSE:INFY -s SELL -q 10 --stoploss 1400 --target 1800 -t MARKET
+      An OCO: whichever leg fires first cancels the other
+  $ kite gtt delete 123456  Remove a trigger
 ```
 
 ### `kite gtt list`
@@ -606,6 +815,12 @@ Show your GTT triggers
 Options:
   --active    Show only active triggers
   -h, --help  display help for command
+
+Examples:
+  $ kite gtt                Every trigger, including triggered and cancelled ones
+  $ kite gtt list --active  Only triggers still waiting
+  $ kite gtt list --active --json | jq -r '.[].id'
+      Trigger ids, for scripting
 ```
 
 ### `kite gtt get`
@@ -617,6 +832,10 @@ Show one GTT trigger in detail
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite gtt get 123456         Both legs, their triggers, and the current status
+  $ kite gtt get 123456 --json  The raw trigger as Kite stores it
 ```
 
 ### `kite gtt place`
@@ -647,6 +866,27 @@ Options:
   --last-price <price>      Reference price for percentage triggers and the
                             leg-direction check; never sent to Kite
   -h, --help                display help for command
+
+A GTT is either single-leg (--trigger, one --price) or an OCO (--stoploss and
+--target, priced with --stoploss-price and --target-price). The two shapes never
+mix, and for a SELL the stoploss sits below the last price while the target sits
+above — pass --last-price to have that checked before anything is created.
+
+Examples:
+  $ kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395
+      Single leg: trigger at 1400, sell down to 1395
+  $ kite gtt place NSE:INFY -s BUY -q 10 --trigger 1800 -t MARKET
+      Single leg at market — no limit price, so the type is explicit
+  $ kite gtt place NSE:INFY -s SELL -q 10 --stoploss 1400 --target 1800 -t MARKET
+      OCO at market: stop below, target above
+  $ kite gtt place NSE:INFY -s SELL -q 10 --stoploss 1400 --stoploss-price 1395 --target 1800 --target-price 1795
+      OCO with a limit price on each leg
+  $ kite gtt place NSE:INFY -s SELL -q 10 --stoploss 5% --target 10% --last-price 1650 -t MARKET
+      Legs as a distance from a reference price
+  $ kite gtt place NFO:NIFTY25AUGFUT -s SELL -q 75 --trigger 24000 -t MARKET --product NRML
+      --product is required on a derivatives exchange
+  $ kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395 --dry-run
+      Preview without creating it
 ```
 
 ### `kite gtt delete`
@@ -658,6 +898,11 @@ Delete a GTT trigger
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite gtt delete 123456  Delete one trigger
+  $ kite gtt list --active --json | jq -r '.[].id' | xargs -n1 kite gtt delete -y
+      Clear every active trigger
 ```
 
 ## `kite alerts`
@@ -680,6 +925,13 @@ Commands:
   disable <uuid>                 Disable an alert without deleting it
   delete <uuid...>               Delete one or more alerts
   help [command]                 display help for command
+
+Examples:
+  $ kite alerts                       Your alerts and whether they are enabled
+  $ kite alerts create NSE:INFY -o above --value 1800
+      Notify when INFY crosses ₹1,800
+  $ kite alerts disable 5e3c2a1b-...  Silence one without deleting it
+  $ kite alerts history 5e3c2a1b-...  When did it fire?
 ```
 
 ### `kite alerts list`
@@ -693,6 +945,11 @@ Options:
   --enabled   Show only enabled alerts
   --disabled  Show only disabled alerts
   -h, --help  display help for command
+
+Examples:
+  $ kite alerts                                 Every alert (list is the default)
+  $ kite alerts list --enabled                  Only alerts currently armed
+  $ kite alerts list --json | jq -r '.[].uuid'  Alert ids, for scripting
 ```
 
 ### `kite alerts get`
@@ -704,6 +961,10 @@ Show one alert in detail
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite alerts get 5e3c2a1b-8f4d-4c2e-9a71-6b0d2f3c8e15
+      The full condition and any ATO basket
 ```
 
 ### `kite alerts history`
@@ -715,6 +976,10 @@ Show an alert's trigger history
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite alerts history 5e3c2a1b-8f4d-4c2e-9a71-6b0d2f3c8e15
+      Every time this alert has fired
 ```
 
 ### `kite alerts create`
@@ -757,6 +1022,28 @@ Options:
   --validity <validity>          ATO: validity, default DAY (DAY, IOC, TTL)
                                  (single-order form)
   -h, --help                     display help for command
+
+A simple alert only notifies. An ATO alert places real orders when it fires:
+either one order on the watched instrument (-s/-q/--order-type ...) or a basket
+of --order legs on any instruments — never both forms at once.
+
+Examples:
+  $ kite alerts create NSE:INFY -o above --value 1800
+      Notify when INFY trades above ₹1,800
+  $ kite alerts create "INDICES:NIFTY 50" -o below --value 24000
+      Watch an index
+  $ kite alerts create NSE:INFY -o \>= --value 1800 --name "book profit"
+      Symbolic operators need escaping in most shells
+  $ kite alerts create NSE:INFY -o above --rhs-instrument NSE:TCS
+      Compare two instruments instead of a constant
+  $ kite alerts create NSE:INFY -o below --value 1500 --type ato -s BUY -q 10
+      ATO: buy 10 INFY at market when it drops below 1500
+  $ kite alerts create NSE:INFY -o below --value 1500 --type ato --order-type LIMIT -p 1495 -s BUY -q 10
+      ATO with a limit price
+  $ kite alerts create "INDICES:NIFTY 50" -o below --value 24000 --type ato --order NFO:NIFTY25AUGFUT:SELL:75:MARKET:NRML
+      ATO basket: sell futures off an index level — repeat --order for more legs
+  $ kite alerts create NSE:INFY -o above --value 1800 --type ato -s SELL -q 10 --dry-run
+      Preview an ATO
 ```
 
 ### `kite alerts modify`
@@ -771,6 +1058,14 @@ Options:
   --value <n>          New threshold constant
   --name <name>        New alert name
   -h, --help           display help for command
+
+Examples:
+  $ kite alerts modify 5e3c2a1b-... --value 1900
+      Move the threshold
+  $ kite alerts modify 5e3c2a1b-... -o below --value 1500
+      Flip the condition
+  $ kite alerts modify 5e3c2a1b-... --name "exit signal"
+      Rename it
 ```
 
 ### `kite alerts enable`
@@ -782,6 +1077,9 @@ Re-enable a disabled alert
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite alerts enable 5e3c2a1b-...  Arm it again
 ```
 
 ### `kite alerts disable`
@@ -793,6 +1091,9 @@ Disable an alert without deleting it
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite alerts disable 5e3c2a1b-...  Keep the alert, stop it firing
 ```
 
 ### `kite alerts delete`
@@ -807,6 +1108,12 @@ Arguments:
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite alerts delete 5e3c2a1b-...               Delete one alert
+  $ kite alerts delete 5e3c2a1b-... 7d1f4c9a-...  Delete several in one call
+  $ kite alerts list --json | jq -r '.[].uuid' | xargs kite alerts delete -y
+      Delete every alert
 ```
 
 ## `kite margins`
@@ -826,6 +1133,14 @@ Commands:
   charges <orders...>           Itemised charges for a set of executed orders
                                 (virtual contract note)
   help [command]                display help for command
+
+Examples:
+  $ kite margins order NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML
+      What would this cost to carry?
+  $ kite margins basket <leg> <leg>
+      What does the hedge save?
+  $ kite margins charges NSE:INFY:BUY:10:MARKET:CNC:regular:1650
+      Brokerage and taxes on a fill
 ```
 
 ### `kite margins order`
@@ -843,6 +1158,16 @@ Arguments:
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite margins order NSE:INFY:BUY:10
+      Delivery buy — product defaults to CNC
+  $ kite margins order NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML
+      One futures contract, carried
+  $ kite margins order NSE:INFY:BUY:10:LIMIT:MIS:regular:1650
+      Intraday limit order at a stated price
+  $ kite margins order NFO:NIFTY25AUG24500CE:SELL:75:MARKET:NRML NFO:NIFTY25AUG24700CE:BUY:75:MARKET:NRML
+      Each leg costed separately (no hedge benefit)
 ```
 
 ### `kite margins basket`
@@ -861,6 +1186,12 @@ Arguments:
 Options:
   --no-consider-positions  Ignore existing positions when netting
   -h, --help               display help for command
+
+Examples:
+  $ kite margins basket NFO:NIFTY25AUG24500CE:SELL:75:MARKET:NRML NFO:NIFTY25AUG24700CE:BUY:75:MARKET:NRML
+      A spread — this is where the hedge benefit shows up
+  $ kite margins basket NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML --no-consider-positions
+      Cost of the basket alone, ignoring what you already hold
 ```
 
 ### `kite margins charges`
@@ -879,6 +1210,12 @@ Arguments:
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite margins charges NSE:INFY:BUY:10:MARKET:CNC:regular:1650
+      Brokerage, STT, stamp duty and GST on a delivery buy
+  $ kite margins charges NSE:INFY:BUY:10:MARKET:MIS:regular:1650 NSE:INFY:SELL:10:MARKET:MIS:regular:1665
+      Round trip: both sides of an intraday trade
 ```
 
 ## `kite watch`
@@ -898,6 +1235,13 @@ Options:
   --fps <n>          Screen repaints per second (default: "4")
   --orders           Also print live order updates
   -h, --help         display help for command
+
+Examples:
+  $ kite watch NSE:INFY NSE:TCS           Stream two symbols; Ctrl-C to stop
+  $ kite watch --holdings                 Stream everything you hold
+  $ kite watch --positions --orders       Positions, plus order updates as they happen
+  $ kite watch NSE:INFY -m full           Full mode: depth, OI and the day range
+  $ kite watch --holdings -m ltp --fps 1  Cheapest mode, repainting once a second
 ```
 
 ## `kite mcp`
@@ -909,6 +1253,11 @@ Run a read-only MCP server over stdio for LLM agents (Claude and others)
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite mcp                         Usually launched by the client, not typed by hand
+  $ claude mcp add kite -- kite mcp  Register the server with Claude Code
+  $ kite --profile huf mcp           Serve a specific account
 ```
 
 ## `kite config`
@@ -927,6 +1276,12 @@ Commands:
   unset <key>        Remove a configuration value, restoring its default
   path               Print the paths this CLI reads and writes
   help [command]     display help for command
+
+Examples:
+  $ kite config                                   Show the effective configuration
+  $ kite config set trading.enabled false         Kill switch: refuse every order command
+  $ kite config set trading.maxOrderValue 100000  Refuse any single order above ₹1,00,000
+  $ kite config path                              Where config, cache and secrets live
 ```
 
 ### `kite config show`
@@ -938,6 +1293,10 @@ Show the current configuration
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite config              Every setting and its current value (show is the default)
+  $ kite config show --json  Machine-readable configuration
 ```
 
 ### `kite config set`
@@ -953,6 +1312,14 @@ Arguments:
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite config set trading.enabled false         Disable trading entirely
+  $ kite config set trading.maxOrderValue 100000  Cap the value of any single order
+  $ kite config set trading.strictConfirmAbove 50000
+      Above this, type the symbol to confirm
+  $ kite config set output.compact true           Borderless tables
+  $ kite config set output.color never            Never colour output
 ```
 
 ### `kite config unset`
@@ -964,6 +1331,10 @@ Remove a configuration value, restoring its default
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite config unset trading.maxOrderValue  Remove the per-order cap
+  $ kite config unset output.color           Back to automatic colour detection
 ```
 
 ### `kite config path`
@@ -975,6 +1346,10 @@ Print the paths this CLI reads and writes
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite config path         Config file, instrument cache and secret store
+  $ kite config path --json  Paths as JSON
 ```
 
 ## `kite doctor`
@@ -986,6 +1361,11 @@ Run offline health checks on your configuration, credentials, and session
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite doctor                Check config, credentials, session and caches
+  $ kite doctor --json         Machine-readable checks, for a health probe
+  $ kite --profile huf doctor  Check another account
 ```
 
 ## `kite completion`
@@ -1005,4 +1385,10 @@ Arguments:
 
 Options:
   -h, --help  display help for command
+
+Examples:
+  $ kite completion                Print a script for the shell in $SHELL
+  $ kite completion fish > ~/.config/fish/completions/kite.fish
+      Install for fish
+  $ eval "$(kite completion zsh)"  Load into the current zsh session
 ```

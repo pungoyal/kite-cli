@@ -27,6 +27,7 @@ import {
 } from '../core/session.js';
 import { dateTime } from '../output/format.js';
 import { printTable, renderKeyValue } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 export const authCommands: CommandFactory = (program, run) => {
@@ -39,18 +40,44 @@ export const authCommands: CommandFactory = (program, run) => {
     )
     .option('--api-key <key>', 'Kite Connect API key (prompted for if absent)')
     .option('--force', 'Log in again even if the current session is still valid')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite login', 'Open a browser and store the session'],
+        ['kite login --manual', 'Paste the request token by hand (headless/SSH)'],
+        ['kite login --api-key abcd1234efgh5678', 'Use a specific API key instead of the stored one'],
+        ['kite login --force', 'Re-authenticate even if the session is still valid'],
+        ['kite --profile huf login', 'Log in to another account (see `kite profiles`)'],
+      ]),
+    )
     .action(run(login));
 
   program
     .command('logout')
     .description('Invalidate the session and remove the stored access token')
     .option('--all', 'Also remove the stored API secret')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite logout', 'Forget the access token, keep the API secret'],
+        ['kite logout --all', 'Also forget the API secret — a full login next time'],
+        ['kite --profile huf logout', 'Log out of one profile only'],
+      ]),
+    )
     .action(run(logout));
 
   program
     .command('whoami')
     .description('Show the current session and account details')
     .option('--all', 'List every configured profile and its session status')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite whoami', 'Verify which account this session belongs to'],
+        ['kite whoami --all', 'Session status for every configured profile'],
+        ['kite whoami --json | jq -r .account.user_id', 'Just the Kite user id'],
+      ]),
+    )
     .action(run(whoami));
 };
 

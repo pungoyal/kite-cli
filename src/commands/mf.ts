@@ -2,6 +2,7 @@ import type { Context } from '../context.js';
 import type { MfHolding, MfOrder, MfSip } from '../core/schemas.js';
 import { dateTime, money, quantity, rupees, signedRupees } from '../output/format.js';
 import { type Column, printTable } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -13,13 +14,38 @@ import type { CommandFactory } from './types.js';
  * that moves money. No kill switch, value cap, or confirmation applies.
  */
 export const mfCommands: CommandFactory = (program, run) => {
-  const mf = program.command('mf').description('View mutual fund holdings, orders and SIPs');
+  const mf = program
+    .command('mf')
+    .description('View mutual fund holdings, orders and SIPs')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite mf', 'Your fund holdings (holdings is the default)'],
+        ['kite mf orders', 'Purchases and redemptions from the last 7 days'],
+        ['kite mf sips', 'Standing instructions and their next instalment'],
+      ]),
+    );
 
-  mf.command('holdings', { isDefault: true }).description('Show your mutual fund holdings').action(run(mfHoldings));
+  mf.command('holdings', { isDefault: true })
+    .description('Show your mutual fund holdings')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite mf holdings', 'Units, average cost and current value per fund'],
+        [`kite mf holdings --json | jq '[.[].pnl] | add'`, 'Total unrealised P&L across funds'],
+      ]),
+    )
+    .action(run(mfHoldings));
 
-  mf.command('orders').description('Show mutual fund orders from the last 7 days').action(run(mfOrders));
+  mf.command('orders')
+    .description('Show mutual fund orders from the last 7 days')
+    .addHelpText('after', examples([['kite mf orders', 'Recent purchases and redemptions']]))
+    .action(run(mfOrders));
 
-  mf.command('sips').description('Show your mutual fund SIPs').action(run(mfSips));
+  mf.command('sips')
+    .description('Show your mutual fund SIPs')
+    .addHelpText('after', examples([['kite mf sips', 'Every SIP, its instalment and next due date']]))
+    .action(run(mfSips));
 };
 
 async function mfHoldings(ctx: Context): Promise<void> {

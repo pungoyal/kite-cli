@@ -18,27 +18,62 @@ import { type Order, TERMINAL_ORDER_STATUSES, type Trade } from '../core/schemas
 import { dateTime, money, quantity, rupees, timeOnly } from '../output/format.js';
 import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
 import { assertTradingEnabled, buildOrderTag, CLI_TAG_PREFIX, confirmAction } from '../safety.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 export const orderCommands: CommandFactory = (program, run) => {
-  const orders = program.command('orders').description('View and manage orders');
+  const orders = program
+    .command('orders')
+    .description('View and manage orders')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite orders', "Today's orderbook"],
+        ['kite orders place NSE:INFY -s BUY -q 1 --dry-run', 'Preview an order without sending it'],
+        ['kite orders get 250724000123456', 'Did it actually execute?'],
+        ['kite orders cancel 250724000123456', 'Cancel a working order'],
+      ]),
+    );
 
   orders
     .command('list', { isDefault: true })
     .description("Show today's orderbook")
     .option('--open', 'Show only orders that are still working')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite orders', 'Every order placed today (list is the default)'],
+        ['kite orders list --open', 'Only orders still working'],
+        [`kite orders list --open --json | jq -r '.[].order_id'`, 'Order ids, for scripting'],
+      ]),
+    )
     .action(run(listOrders));
 
   orders
     .command('get')
     .description('Show the full state history of one order')
     .argument('<order-id>')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite orders get 250724000123456', 'Every status this order passed through'],
+        ['kite orders get 250724000123456 --json', 'The raw status history'],
+      ]),
+    )
     .action(run(getOrder));
 
   orders
     .command('reconcile')
     .description('Check whether a tagged order reached Kite (recovery after an ambiguous failure)')
     .argument('[tag]', 'Order tag to look up; omit to list the orders this CLI placed today')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite orders reconcile', 'List every order this CLI tagged today'],
+        ['kite orders reconcile kc1a2b3c4d5e6f', 'Did the order with this tag reach Kite?'],
+        ['kite orders reconcile myhedge9f8e7d6c', 'Same, for an order placed with --tag myhedge'],
+      ]),
+    )
     .action(run(reconcileOrders));
 
   orders
@@ -58,6 +93,29 @@ export const orderCommands: CommandFactory = (program, run) => {
     .option('--iceberg-legs <n>', 'Number of iceberg legs (2-50)')
     .option('--iceberg-quantity <n>', 'Quantity per iceberg leg')
     .option('--tag <tag>', 'Custom tag, max 20 alphanumeric characters')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite orders place NSE:INFY -s BUY -q 1 --dry-run', 'Preview the resolved order, send nothing'],
+        ['kite orders place NSE:INFY -s BUY -q 10', 'Market buy, delivery (CNC is the default)'],
+        ['kite orders place NSE:INFY -s SELL -q 10 -t LIMIT -p 1650', 'Limit sell at ₹1,650'],
+        [
+          'kite orders place NSE:INFY -s SELL -q 10 -t SL -p 1595 --trigger-price 1600',
+          'Stop-loss: triggers at 1600, sells down to 1595',
+        ],
+        ['kite orders place NSE:TCS -s BUY -q 5 --product MIS', 'Intraday, squared off by the broker'],
+        [
+          'kite orders place NFO:NIFTY25AUGFUT -s BUY -q 75 --product NRML -t LIMIT -p 24500',
+          'Futures, carried overnight',
+        ],
+        [
+          'kite orders place NSE:INFY -s BUY -q 1000 --variety iceberg --iceberg-legs 5 --iceberg-quantity 200',
+          'Slice a large order into 5 legs of 200',
+        ],
+        ['kite orders place NSE:INFY -s BUY -q 10 --variety amo', 'After-market order for the next session'],
+        ['kite orders place NSE:INFY -s BUY -q 10 --tag rebalance', 'Tag it, so `orders reconcile` can find it'],
+      ]),
+    )
     .action(run(placeOrder));
 
   orders
@@ -70,6 +128,15 @@ export const orderCommands: CommandFactory = (program, run) => {
     .option('-t, --type <type>', `New order type (${ORDER_TYPES.join(', ')})`)
     .option('--validity <validity>', `New validity (${VALIDITIES.join(', ')})`)
     .option('--variety <variety>', 'Order variety (inferred from the orderbook if omitted)')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite orders modify 250724000123456 -p 1655', 'Chase the price on a working limit order'],
+        ['kite orders modify 250724000123456 -q 5 -p 1650', 'Change quantity and price together'],
+        ['kite orders modify 250724000123456 -t MARKET', 'Give up on the limit and fill at market'],
+        ['kite orders modify 250724000123456 --trigger-price 1610', 'Move a stop-loss trigger'],
+      ]),
+    )
     .action(run(modifyOrder));
 
   orders
@@ -77,9 +144,30 @@ export const orderCommands: CommandFactory = (program, run) => {
     .description('Cancel a pending order')
     .argument('<order-id>')
     .option('--variety <variety>', 'Order variety (inferred from the orderbook if omitted)')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite orders cancel 250724000123456', 'Cancel one working order'],
+        ['kite orders cancel 250724000123456 --variety amo', 'When the variety cannot be inferred'],
+        [
+          `kite orders list --open --json | jq -r '.[].order_id' | xargs -n1 kite orders cancel -y`,
+          'Cancel everything still working',
+        ],
+      ]),
+    )
     .action(run(cancelOrder));
 
-  program.command('trades').description("Show today's executed trades").action(run(listTrades));
+  program
+    .command('trades')
+    .description("Show today's executed trades")
+    .addHelpText(
+      'after',
+      examples([
+        ['kite trades', 'Every fill today, with price and time'],
+        [`kite trades --json | jq '[.[].quantity] | add'`, 'Total quantity traded today'],
+      ]),
+    )
+    .action(run(listTrades));
 };
 
 // ---------------------------------------------------------------------------
