@@ -119,7 +119,7 @@ async function generate() {
     rootHelp,
     '```',
     '',
-    "Exit codes are documented in the README's [Scripting](https://github.com/pungoyal/kite-cli#scripting) section.",
+    'Exit codes, the JSON output contract, and CI usage are documented in [Scripting & automation](scripting.md).',
     '',
     ...body,
   ].join('\n');

@@ -2,7 +2,7 @@
 
 Symptom-first fixes for the operational gotchas that come up running this
 CLI against a real Kite Connect app. For the exit code a script can branch
-on, see the README's [exit code table](https://github.com/pungoyal/kite-cli#scripting); this page
+on, see the [exit code table](scripting.md#exit-codes); this page
 explains *why* each one happens and what to do about it.
 
 Before digging through the sections below, run `kite doctor` — it makes no
