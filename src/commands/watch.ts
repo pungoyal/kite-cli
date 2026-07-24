@@ -6,6 +6,7 @@ import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js'
 import { MAX_INSTRUMENTS_PER_CONNECTION, type Tick, Ticker, type TickerMode } from '../core/ticker.js';
 import { compactNumber, money, percent, timeOnly } from '../output/format.js';
 import { type Column, renderTable } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -34,6 +35,16 @@ export const watchCommands: CommandFactory = (program, run) => {
     .option('-m, --mode <mode>', 'Streaming mode: ltp, quote, or full', 'quote')
     .option('--fps <n>', 'Screen repaints per second', '4')
     .option('--orders', 'Also print live order updates')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite watch NSE:INFY NSE:TCS', 'Stream two symbols; Ctrl-C to stop'],
+        ['kite watch --holdings', 'Stream everything you hold'],
+        ['kite watch --positions --orders', 'Positions, plus order updates as they happen'],
+        ['kite watch NSE:INFY -m full', 'Full mode: depth, OI and the day range'],
+        ['kite watch --holdings -m ltp --fps 1', 'Cheapest mode, repainting once a second'],
+      ]),
+    )
     .action(run(watch));
 };
 

@@ -13,6 +13,7 @@ import type { Gtt } from '../core/schemas.js';
 import { dateOnly, money, quantity, rupees } from '../output/format.js';
 import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
 import { assertTradingEnabled, confirmAction } from '../safety.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -34,15 +35,48 @@ import type { CommandFactory } from './types.js';
  * closes a long, so the two swap.
  */
 export const gttCommands: CommandFactory = (program, run) => {
-  const gtt = program.command('gtt').description('Manage Good Till Triggered orders');
+  const gtt = program
+    .command('gtt')
+    .description('Manage Good Till Triggered orders')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite gtt', 'Your standing triggers'],
+        ['kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395', 'A single-leg stop, valid for a year'],
+        [
+          'kite gtt place NSE:INFY -s SELL -q 10 --stoploss 1400 --target 1800 -t MARKET',
+          'An OCO: whichever leg fires first cancels the other',
+        ],
+        ['kite gtt delete 123456', 'Remove a trigger'],
+      ]),
+    );
 
   gtt
     .command('list', { isDefault: true })
     .description('Show your GTT triggers')
     .option('--active', 'Show only active triggers')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite gtt', 'Every trigger, including triggered and cancelled ones'],
+        ['kite gtt list --active', 'Only triggers still waiting'],
+        [`kite gtt list --active --json | jq -r '.[].id'`, 'Trigger ids, for scripting'],
+      ]),
+    )
     .action(run(listGtt));
 
-  gtt.command('get').description('Show one GTT trigger in detail').argument('<id>').action(run(getGtt));
+  gtt
+    .command('get')
+    .description('Show one GTT trigger in detail')
+    .argument('<id>')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite gtt get 123456', 'Both legs, their triggers, and the current status'],
+        ['kite gtt get 123456 --json', 'The raw trigger as Kite stores it'],
+      ]),
+    )
+    .action(run(getGtt));
 
   gtt
     .command('place')
@@ -62,9 +96,55 @@ export const gttCommands: CommandFactory = (program, run) => {
       '--last-price <price>',
       'Reference price for percentage triggers and the leg-direction check; never sent to Kite',
     )
+    .addHelpText(
+      'after',
+      `
+A GTT is either single-leg (--trigger, one --price) or an OCO (--stoploss and
+--target, priced with --stoploss-price and --target-price). The two shapes never
+mix, and for a SELL the stoploss sits below the last price while the target sits
+above — pass --last-price to have that checked before anything is created.
+${examples([
+  [
+    'kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395',
+    'Single leg: trigger at 1400, sell down to 1395',
+  ],
+  [
+    'kite gtt place NSE:INFY -s BUY -q 10 --trigger 1800 -t MARKET',
+    'Single leg at market — no limit price, so the type is explicit',
+  ],
+  [
+    'kite gtt place NSE:INFY -s SELL -q 10 --stoploss 1400 --target 1800 -t MARKET',
+    'OCO at market: stop below, target above',
+  ],
+  [
+    'kite gtt place NSE:INFY -s SELL -q 10 --stoploss 1400 --stoploss-price 1395 --target 1800 --target-price 1795',
+    'OCO with a limit price on each leg',
+  ],
+  [
+    'kite gtt place NSE:INFY -s SELL -q 10 --stoploss 5% --target 10% --last-price 1650 -t MARKET',
+    'Legs as a distance from a reference price',
+  ],
+  [
+    'kite gtt place NFO:NIFTY25AUGFUT -s SELL -q 75 --trigger 24000 -t MARKET --product NRML',
+    '--product is required on a derivatives exchange',
+  ],
+  ['kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395 --dry-run', 'Preview without creating it'],
+])}`,
+    )
     .action(run(placeGtt));
 
-  gtt.command('delete').description('Delete a GTT trigger').argument('<id>').action(run(deleteGtt));
+  gtt
+    .command('delete')
+    .description('Delete a GTT trigger')
+    .argument('<id>')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite gtt delete 123456', 'Delete one trigger'],
+        [`kite gtt list --active --json | jq -r '.[].id' | xargs -n1 kite gtt delete -y`, 'Clear every active trigger'],
+      ]),
+    )
+    .action(run(deleteGtt));
 };
 
 /** Exchanges where CNC — an equity-delivery product — is not a valid choice. */

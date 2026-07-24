@@ -6,6 +6,7 @@ import type { Holding, Position, SegmentMargin } from '../core/schemas.js';
 import { money, percent, quantity, rupees, signedRupees } from '../output/format.js';
 import { type Column, heading, printTable, renderKeyValue } from '../output/table.js';
 import { confirmAction } from '../safety.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 export const portfolioCommands: CommandFactory = (program, run) => {
@@ -13,18 +14,43 @@ export const portfolioCommands: CommandFactory = (program, run) => {
     .command('holdings')
     .description('Show your long-term holdings')
     .option('--sort <field>', 'Sort by: symbol, value, pnl, day', 'value')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite holdings', 'Everything you hold, largest position first'],
+        ['kite holdings --sort pnl', 'Best to worst performer'],
+        ['kite holdings --sort day', "Sort by today's move"],
+        ["kite holdings --json | jq -r '.[].tradingsymbol'", 'Just the symbols, for scripting'],
+      ]),
+    )
     .action(run(holdings));
 
   program
     .command('positions')
     .description('Show your open positions')
     .option('--day', 'Show intraday positions instead of net')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite positions', 'Net positions carried plus today'],
+        ['kite positions --day', "Only today's intraday positions"],
+        ["kite positions --json | jq '.[].pnl'", 'JSON is the array being shown, not {net, day}'],
+      ]),
+    )
     .action(run(positions));
 
   program
     .command('funds')
     .description('Show available margin and funds')
     .option('--segment <segment>', 'equity or commodity')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite funds', 'Equity and commodity margins'],
+        ['kite funds --segment equity', 'Equity only'],
+        ['kite funds --json | jq .equity.net', 'Cash available to trade'],
+      ]),
+    )
     .action(run(funds));
 
   program
@@ -32,6 +58,14 @@ export const portfolioCommands: CommandFactory = (program, run) => {
     .alias('authorize')
     .description('Authorise holdings at the depository so they can be sold (recovers from HTTP 428)')
     .argument('[isins...]', 'Specific ISINs to authorise. Omit to authorise the whole demat account.')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite authorise', 'Authorise the whole demat account'],
+        ['kite authorise INE009A01021', 'Authorise one holding by ISIN'],
+        ['kite authorise INE009A01021 INE467B01029', 'Authorise several at once'],
+      ]),
+    )
     .action(run(authoriseHoldings));
 
   const convert = program
@@ -43,6 +77,17 @@ export const portfolioCommands: CommandFactory = (program, run) => {
     .requiredOption('--to <product>', `Target product (${PRODUCTS.join(', ')})`)
     .option('--transaction-type <type>', 'BUY or SELL', 'BUY')
     .option('--position-type <type>', 'overnight or day', 'day')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite convert NSE:INFY --quantity 10 --from MIS --to CNC', 'Carry an intraday buy forward as delivery'],
+        ['kite convert NSE:INFY --quantity 10 --from MIS --to CNC --dry-run', 'Preview it first'],
+        [
+          'kite convert NFO:NIFTY25AUGFUT --quantity 75 --from NRML --to MIS --transaction-type SELL',
+          'Convert a short futures position to intraday margin',
+        ],
+      ]),
+    )
     .action(run(convertPosition));
   void convert;
 };

@@ -14,6 +14,7 @@ import {
 } from '../core/profiles.js';
 import { clearSessionMeta, isExpired, loadSessionMeta, timeUntilExpiry } from '../core/session.js';
 import { printTable, renderKeyValue } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -26,12 +27,31 @@ import type { CommandFactory } from './types.js';
  */
 
 export const profileCommands: CommandFactory = (program, run) => {
-  const profiles = program.command('profiles').description('Manage account profiles for multiple Zerodha accounts');
+  const profiles = program
+    .command('profiles')
+    .description('Manage account profiles for multiple Zerodha accounts')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite profiles', 'List profiles and their session status'],
+        ['kite profiles add huf --api-key abcd1234efgh5678', 'Register a second account'],
+        ['kite --profile huf login', 'Log in to it (each profile has its own session)'],
+        ['kite --profile huf holdings', 'Run any command against it'],
+        ['kite profiles use huf', 'Make it the default for future commands'],
+      ]),
+    );
 
   profiles
     .command('list', { isDefault: true })
     .alias('ls')
     .description('List configured profiles and their session status')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite profiles list', 'Every profile, with which one is the default'],
+        ['kite profiles ls --json', 'Machine-readable listing'],
+      ]),
+    )
     .action(run(listProfiles));
 
   profiles
@@ -40,6 +60,14 @@ export const profileCommands: CommandFactory = (program, run) => {
     .argument('<name>', 'A short label, e.g. personal or huf')
     .option('--api-key <key>', 'Kite Connect API key for this account')
     .option('--max-order-value <rupees>', 'Per-profile cap on any single order')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite profiles add huf', 'Prompt for the API key'],
+        ['kite profiles add huf --api-key abcd1234efgh5678', 'Supply it up front'],
+        ['kite profiles add huf --max-order-value 50000', 'Cap any single order on this account at ₹50,000'],
+      ]),
+    )
     .action(run(addProfile));
 
   profiles
@@ -47,15 +75,33 @@ export const profileCommands: CommandFactory = (program, run) => {
     .alias('rm')
     .description('Delete a profile and its stored credentials')
     .argument('<name>')
+    .addHelpText('after', examples([['kite profiles remove huf', 'Delete the profile, its API key and its session']]))
     .action(run(removeProfile));
 
   profiles
     .command('use')
     .description('Set the default profile for future commands')
     .argument('<name>')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite profiles use huf', 'Commands without --profile now run against huf'],
+        ['kite profiles use default', 'Go back to the unnamed default account'],
+      ]),
+    )
     .action(run(useProfile));
 
-  profiles.command('current').description('Show the profile this invocation resolves to').action(run(currentProfile));
+  profiles
+    .command('current')
+    .description('Show the profile this invocation resolves to')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite profiles current', 'Which account a bare `kite holdings` would hit'],
+        ['kite --profile huf profiles current', 'Check how an explicit --profile resolves'],
+      ]),
+    )
+    .action(run(currentProfile));
 };
 
 async function listProfiles(ctx: Context): Promise<void> {

@@ -8,6 +8,28 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **Worked examples on every command.** `kite <command> --help` now ends in an
+  `Examples:` block showing the flags actually combined — how a stop-loss order
+  differs from a stop-loss GTT, what an OCO's four price flags mean together,
+  which shape an ATO alert takes, how an order spec is spelled for `margins`.
+  A flag list alone did not show that, and the commands where it mattered most
+  (`gtt place`, `alerts create`) were effectively unusable from their option
+  names.
+
+  The examples live with the command definitions, so
+  [docs/commands.md](docs/commands.md) — generated from `--help` — carries them
+  too, with nothing to keep in sync. `gtt place` and `alerts create` also gain a
+  short note on their two mutually exclusive shapes.
+
+### Fixed
+
+- **`kite --help` and the README documented the wrong JSON shape for
+  `positions`.** Both piped `--json` through `jq '.net[]…'`, but the command
+  emits the array it displays, not the `{net, day}` envelope, so the filter
+  matched nothing. Both now read `jq '.[]…'`.
+
 ## [0.7.0] - 2026-07-24
 
 ### Added

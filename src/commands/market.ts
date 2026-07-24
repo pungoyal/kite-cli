@@ -5,6 +5,7 @@ import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js'
 import type { Candle, Instrument, Quote } from '../core/schemas.js';
 import { compactNumber, dateTime, money, parseUserDate, percent, quantity, timeOnly } from '../output/format.js';
 import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 export const marketCommands: CommandFactory = (program, run) => {
@@ -13,18 +14,44 @@ export const marketCommands: CommandFactory = (program, run) => {
     .description('Show full quotes with market depth')
     .argument('<instruments...>', 'One or more instruments, e.g. NSE:INFY NSE:TCS')
     .option('--depth', 'Show the full 5-level order book')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite quote NSE:INFY', 'Full quote for one instrument'],
+        ['kite quote NSE:INFY NSE:TCS NSE:HDFCBANK', 'Several at once (one API call)'],
+        ['kite quote NSE:INFY --depth', 'With the 5-level bid/ask book'],
+        ['kite quote "INDICES:NIFTY 50"', 'An index — quote a symbol with a space'],
+        ['kite quote NFO:NIFTY25AUGFUT --json', 'JSON keyed by EXCHANGE:SYMBOL'],
+      ]),
+    )
     .action(run(quoteCommand));
 
   program
     .command('ltp')
     .description('Show last traded prices (fastest quote endpoint)')
     .argument('<instruments...>', 'One or more instruments, e.g. NSE:INFY')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite ltp NSE:INFY', 'Last traded price'],
+        ['kite ltp NSE:INFY NSE:TCS', 'Several at once'],
+        [`kite ltp NSE:INFY --json | jq '."NSE:INFY".last_price'`, 'One price, for a script'],
+      ]),
+    )
     .action(run(ltpCommand));
 
   program
     .command('ohlc')
     .description('Show open/high/low/close plus last price')
     .argument('<instruments...>', 'One or more instruments')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite ohlc NSE:INFY', "Today's open/high/low/close and last price"],
+        ['kite ohlc NSE:INFY NSE:TCS', 'Several at once'],
+        ['kite ohlc "INDICES:NIFTY 50" --json', 'Index OHLC as JSON'],
+      ]),
+    )
     .action(run(ohlcCommand));
 
   program
@@ -38,9 +65,29 @@ export const marketCommands: CommandFactory = (program, run) => {
     .option('--continuous', 'Stitch expired contracts (futures only)')
     .option('--csv', 'Emit CSV instead of a table')
     .option('--limit <n>', 'Show only the last N candles in table view', '30')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite history NSE:INFY', 'Daily candles for the last 30 days'],
+        ['kite history NSE:INFY -i 5minute --from 7d', 'Intraday candles for the last week'],
+        ['kite history NSE:INFY --from 2025-01-01 --to 2025-03-31 --csv > infy.csv', 'A date range, as CSV'],
+        ['kite history NFO:NIFTY25AUGFUT -i 15minute --oi', 'Futures candles with open interest'],
+        ['kite history NFO:NIFTY25AUGFUT --continuous', 'Stitch expired contracts into one series'],
+        ['kite history NSE:INFY --limit 5', 'Show only the last 5 candles in the table'],
+      ]),
+    )
     .action(run(historyCommand));
 
-  const instruments = program.command('instruments').description('Browse the instrument master');
+  const instruments = program
+    .command('instruments')
+    .description('Browse the instrument master')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite instruments search INFY', 'Find a tradingsymbol to use elsewhere'],
+        ['kite instruments refresh', 'Re-download after expiries or new listings'],
+      ]),
+    );
 
   instruments
     .command('search')
@@ -49,9 +96,25 @@ export const marketCommands: CommandFactory = (program, run) => {
     .option('-e, --exchange <exchange>', 'Filter by exchange, e.g. NSE, NFO')
     .option('-t, --type <type>', 'Filter by instrument type, e.g. EQ, FUT, CE, PE')
     .option('-n, --limit <n>', 'Maximum results', '25')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite instruments search INFY', 'Anything matching INFY'],
+        ['kite instruments search INFY -e NSE -t EQ', 'Only the NSE equity line'],
+        ['kite instruments search "nifty bank" -e NFO -t FUT', 'Bank Nifty futures contracts'],
+        ['kite instruments search NIFTY -e NFO -t CE -n 50', 'Up to 50 call options'],
+      ]),
+    )
     .action(run(searchCommand));
 
-  instruments.command('refresh').description('Re-download the instrument master').action(run(refreshCommand));
+  instruments
+    .command('refresh')
+    .description('Re-download the instrument master')
+    .addHelpText(
+      'after',
+      examples([['kite instruments refresh', 'Refresh the cached contract list (run after expiry day)']]),
+    )
+    .action(run(refreshCommand));
 };
 
 async function quoteCommand(ctx: Context, opts: { depth?: boolean }, command: { args: string[] }): Promise<void> {

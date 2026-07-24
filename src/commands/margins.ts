@@ -13,6 +13,7 @@ import { formatInstrumentKey, parseInstrumentKey } from '../core/instruments.js'
 import type { BasketMargin, OrderMargin } from '../core/schemas.js';
 import { money, rupees } from '../output/format.js';
 import { type Column, heading, printTable, renderKeyValue } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -25,7 +26,17 @@ import type { CommandFactory } from './types.js';
  * placed, so none of the trading safety layer applies.
  */
 export const marginCommands: CommandFactory = (program, run) => {
-  const margins = program.command('margins').description('Calculate order margins and charges (nothing is placed)');
+  const margins = program
+    .command('margins')
+    .description('Calculate order margins and charges (nothing is placed)')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite margins order NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML', 'What would this cost to carry?'],
+        ['kite margins basket <leg> <leg>', 'What does the hedge save?'],
+        ['kite margins charges NSE:INFY:BUY:10:MARKET:CNC:regular:1650', 'Brokerage and taxes on a fill'],
+      ]),
+    );
 
   const orderExample =
     'Each order is EXCHANGE:SYMBOL:SIDE:QTY[:TYPE][:PRODUCT][:VARIETY][:PRICE][:trigger=<n>], ' +
@@ -35,6 +46,18 @@ export const marginCommands: CommandFactory = (program, run) => {
     .command('order')
     .description('Required margin for each order on its own')
     .argument('<orders...>', orderExample)
+    .addHelpText(
+      'after',
+      examples([
+        ['kite margins order NSE:INFY:BUY:10', 'Delivery buy — product defaults to CNC'],
+        ['kite margins order NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML', 'One futures contract, carried'],
+        ['kite margins order NSE:INFY:BUY:10:LIMIT:MIS:regular:1650', 'Intraday limit order at a stated price'],
+        [
+          'kite margins order NFO:NIFTY25AUG24500CE:SELL:75:MARKET:NRML NFO:NIFTY25AUG24700CE:BUY:75:MARKET:NRML',
+          'Each leg costed separately (no hedge benefit)',
+        ],
+      ]),
+    )
     .action(run(orderMargins));
 
   margins
@@ -42,12 +65,38 @@ export const marginCommands: CommandFactory = (program, run) => {
     .description('Net margin for a basket of orders, with spread/hedge benefit')
     .argument('<orders...>', orderExample)
     .option('--no-consider-positions', 'Ignore existing positions when netting')
+    .addHelpText(
+      'after',
+      examples([
+        [
+          'kite margins basket NFO:NIFTY25AUG24500CE:SELL:75:MARKET:NRML NFO:NIFTY25AUG24700CE:BUY:75:MARKET:NRML',
+          'A spread — this is where the hedge benefit shows up',
+        ],
+        [
+          'kite margins basket NFO:NIFTY25AUGFUT:BUY:75:MARKET:NRML --no-consider-positions',
+          'Cost of the basket alone, ignoring what you already hold',
+        ],
+      ]),
+    )
     .action(run(basketMargins));
 
   margins
     .command('charges')
     .description('Itemised charges for a set of executed orders (virtual contract note)')
     .argument('<orders...>', `${orderExample} A non-zero price (the execution price) is required.`)
+    .addHelpText(
+      'after',
+      examples([
+        [
+          'kite margins charges NSE:INFY:BUY:10:MARKET:CNC:regular:1650',
+          'Brokerage, STT, stamp duty and GST on a delivery buy',
+        ],
+        [
+          'kite margins charges NSE:INFY:BUY:10:MARKET:MIS:regular:1650 NSE:INFY:SELL:10:MARKET:MIS:regular:1665',
+          'Round trip: both sides of an intraday trade',
+        ],
+      ]),
+    )
     .action(run(orderCharges));
 };
 

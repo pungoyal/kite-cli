@@ -7,27 +7,76 @@ import { cacheDir, configDir, configFile } from '../core/paths.js';
 import { maskSecret } from '../core/redact.js';
 import { rupees } from '../output/format.js';
 import { heading, renderKeyValue } from '../output/table.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 export const configCommands: CommandFactory = (program, run) => {
-  const config = program.command('config').description('View and change CLI settings');
+  const config = program
+    .command('config')
+    .description('View and change CLI settings')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite config', 'Show the effective configuration'],
+        ['kite config set trading.enabled false', 'Kill switch: refuse every order command'],
+        ['kite config set trading.maxOrderValue 100000', 'Refuse any single order above ₹1,00,000'],
+        ['kite config path', 'Where config, cache and secrets live'],
+      ]),
+    );
 
-  config.command('show', { isDefault: true }).description('Show the current configuration').action(run(showConfig));
+  config
+    .command('show', { isDefault: true })
+    .description('Show the current configuration')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite config', 'Every setting and its current value (show is the default)'],
+        ['kite config show --json', 'Machine-readable configuration'],
+      ]),
+    )
+    .action(run(showConfig));
 
   config
     .command('set')
     .description('Set a configuration value')
     .argument('<key>', 'Dotted key, e.g. trading.maxOrderValue')
     .argument('<value>')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite config set trading.enabled false', 'Disable trading entirely'],
+        ['kite config set trading.maxOrderValue 100000', 'Cap the value of any single order'],
+        ['kite config set trading.strictConfirmAbove 50000', 'Above this, type the symbol to confirm'],
+        ['kite config set output.compact true', 'Borderless tables'],
+        ['kite config set output.color never', 'Never colour output'],
+      ]),
+    )
     .action(run(setConfig));
 
   config
     .command('unset')
     .description('Remove a configuration value, restoring its default')
     .argument('<key>')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite config unset trading.maxOrderValue', 'Remove the per-order cap'],
+        ['kite config unset output.color', 'Back to automatic colour detection'],
+      ]),
+    )
     .action(run(unsetConfig));
 
-  config.command('path').description('Print the paths this CLI reads and writes').action(run(showPaths));
+  config
+    .command('path')
+    .description('Print the paths this CLI reads and writes')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite config path', 'Config file, instrument cache and secret store'],
+        ['kite config path --json', 'Paths as JSON'],
+      ]),
+    )
+    .action(run(showPaths));
 };
 
 async function showConfig(ctx: Context): Promise<void> {

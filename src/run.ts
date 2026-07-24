@@ -94,7 +94,7 @@ Examples:
   $ kite history NSE:INFY -i 5minute --from 7d  Recent 5-minute candles
   $ kite orders place NSE:INFY -s BUY -q 1 --dry-run
                                                 Preview an order without sending it
-  $ kite positions --json | jq '.net[].pnl'     Machine-readable output
+  $ kite positions --json | jq '.[].pnl'        Machine-readable output
   $ kite --profile huf holdings                 Run against another account (kite profiles)
 
 Safety:

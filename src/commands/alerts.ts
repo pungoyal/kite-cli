@@ -21,6 +21,7 @@ import type { Alert, AlertHistoryEntry } from '../core/schemas.js';
 import { dateTime, money, quantity, rupees } from '../output/format.js';
 import { type Column, heading, printTable, renderKeyValue, renderTable } from '../output/table.js';
 import { assertTradingEnabled, confirmAction } from '../safety.js';
+import { examples } from './examples.js';
 import type { CommandFactory } from './types.js';
 
 /**
@@ -34,18 +35,53 @@ import type { CommandFactory } from './types.js';
  *            disguise, so it gets the same safety treatment as `orders place`.
  */
 export const alertCommands: CommandFactory = (program, run) => {
-  const alerts = program.command('alerts').description('Manage price alerts');
+  const alerts = program
+    .command('alerts')
+    .description('Manage price alerts')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite alerts', 'Your alerts and whether they are enabled'],
+        ['kite alerts create NSE:INFY -o above --value 1800', 'Notify when INFY crosses ₹1,800'],
+        ['kite alerts disable 5e3c2a1b-...', 'Silence one without deleting it'],
+        ['kite alerts history 5e3c2a1b-...', 'When did it fire?'],
+      ]),
+    );
 
   alerts
     .command('list', { isDefault: true })
     .description('Show your alerts')
     .option('--enabled', 'Show only enabled alerts')
     .option('--disabled', 'Show only disabled alerts')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite alerts', 'Every alert (list is the default)'],
+        ['kite alerts list --enabled', 'Only alerts currently armed'],
+        [`kite alerts list --json | jq -r '.[].uuid'`, 'Alert ids, for scripting'],
+      ]),
+    )
     .action(run(listAlerts));
 
-  alerts.command('get').description('Show one alert in detail').argument('<uuid>').action(run(getAlert));
+  alerts
+    .command('get')
+    .description('Show one alert in detail')
+    .argument('<uuid>')
+    .addHelpText(
+      'after',
+      examples([['kite alerts get 5e3c2a1b-8f4d-4c2e-9a71-6b0d2f3c8e15', 'The full condition and any ATO basket']]),
+    )
+    .action(run(getAlert));
 
-  alerts.command('history').description("Show an alert's trigger history").argument('<uuid>').action(run(alertHistory));
+  alerts
+    .command('history')
+    .description("Show an alert's trigger history")
+    .argument('<uuid>')
+    .addHelpText(
+      'after',
+      examples([['kite alerts history 5e3c2a1b-8f4d-4c2e-9a71-6b0d2f3c8e15', 'Every time this alert has fired']]),
+    )
+    .action(run(alertHistory));
 
   alerts
     .command('create')
@@ -80,6 +116,35 @@ export const alertCommands: CommandFactory = (program, run) => {
     .option('--trigger-price <price>', 'ATO: trigger price (single-order form; for SL/SL-M)')
     .option('--product <product>', `ATO: product, default CNC (${PRODUCTS.join(', ')}) (single-order form)`)
     .option('--validity <validity>', `ATO: validity, default DAY (${VALIDITIES.join(', ')}) (single-order form)`)
+    .addHelpText(
+      'after',
+      `
+A simple alert only notifies. An ATO alert places real orders when it fires:
+either one order on the watched instrument (-s/-q/--order-type ...) or a basket
+of --order legs on any instruments — never both forms at once.
+${examples([
+  ['kite alerts create NSE:INFY -o above --value 1800', 'Notify when INFY trades above ₹1,800'],
+  ['kite alerts create "INDICES:NIFTY 50" -o below --value 24000', 'Watch an index'],
+  [
+    'kite alerts create NSE:INFY -o \\>= --value 1800 --name "book profit"',
+    'Symbolic operators need escaping in most shells',
+  ],
+  ['kite alerts create NSE:INFY -o above --rhs-instrument NSE:TCS', 'Compare two instruments instead of a constant'],
+  [
+    'kite alerts create NSE:INFY -o below --value 1500 --type ato -s BUY -q 10',
+    'ATO: buy 10 INFY at market when it drops below 1500',
+  ],
+  [
+    'kite alerts create NSE:INFY -o below --value 1500 --type ato --order-type LIMIT -p 1495 -s BUY -q 10',
+    'ATO with a limit price',
+  ],
+  [
+    'kite alerts create "INDICES:NIFTY 50" -o below --value 24000 --type ato --order NFO:NIFTY25AUGFUT:SELL:75:MARKET:NRML',
+    'ATO basket: sell futures off an index level — repeat --order for more legs',
+  ],
+  ['kite alerts create NSE:INFY -o above --value 1800 --type ato -s SELL -q 10 --dry-run', 'Preview an ATO'],
+])}`,
+    )
     .action(run(createAlert));
 
   alerts
@@ -89,20 +154,42 @@ export const alertCommands: CommandFactory = (program, run) => {
     .option('-o, --operator <op>', 'New condition operator')
     .option('--value <n>', 'New threshold constant')
     .option('--name <name>', 'New alert name')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite alerts modify 5e3c2a1b-... --value 1900', 'Move the threshold'],
+        ['kite alerts modify 5e3c2a1b-... -o below --value 1500', 'Flip the condition'],
+        ['kite alerts modify 5e3c2a1b-... --name "exit signal"', 'Rename it'],
+      ]),
+    )
     .action(run(modifyAlert));
 
-  alerts.command('enable').description('Re-enable a disabled alert').argument('<uuid>').action(run(enableAlert));
+  alerts
+    .command('enable')
+    .description('Re-enable a disabled alert')
+    .argument('<uuid>')
+    .addHelpText('after', examples([['kite alerts enable 5e3c2a1b-...', 'Arm it again']]))
+    .action(run(enableAlert));
 
   alerts
     .command('disable')
     .description('Disable an alert without deleting it')
     .argument('<uuid>')
+    .addHelpText('after', examples([['kite alerts disable 5e3c2a1b-...', 'Keep the alert, stop it firing']]))
     .action(run(disableAlert));
 
   alerts
     .command('delete')
     .description('Delete one or more alerts')
     .argument('<uuid...>', 'One or more alert UUIDs')
+    .addHelpText(
+      'after',
+      examples([
+        ['kite alerts delete 5e3c2a1b-...', 'Delete one alert'],
+        ['kite alerts delete 5e3c2a1b-... 7d1f4c9a-...', 'Delete several in one call'],
+        [`kite alerts list --json | jq -r '.[].uuid' | xargs kite alerts delete -y`, 'Delete every alert'],
+      ]),
+    )
     .action(run(deleteAlerts));
 };
 
