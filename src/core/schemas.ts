@@ -374,6 +374,8 @@ export const GttSchema = z.looseObject({
         transaction_type: z.string().optional(),
         quantity: z.number().optional(),
         price: z.number().optional(),
+        // Present on MARKET legs; -1 is Kite's "exchange default".
+        market_protection: z.number().optional(),
         result: z.unknown().nullish(),
       }),
     )

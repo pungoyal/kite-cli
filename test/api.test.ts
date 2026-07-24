@@ -158,6 +158,44 @@ describe('GTT serialisation', () => {
     });
     expect(JSON.parse(params.get('orders') ?? '[]')[0]).toMatchObject({ transaction_type: 'BUY', order_type: 'LIMIT' });
   });
+
+  it('sends a MARKET leg the way Kite itself stores one: price 0 and market_protection -1', async () => {
+    let body = '';
+    pool()
+      .intercept({ path: '/gtt/triggers', method: 'POST' })
+      .reply((opts) => {
+        body = String(opts.body);
+        return { statusCode: 200, data: { status: 'success', data: { trigger_id: 56 } } };
+      });
+
+    await api().placeGtt({
+      type: 'two-leg',
+      condition: {
+        exchange: 'MCX',
+        tradingsymbol: 'COPPER26AUGFUT',
+        trigger_values: [1110, 1360],
+        last_price: 1333.5,
+      },
+      orders: [1110, 1360].map(() => ({
+        exchange: 'MCX',
+        tradingsymbol: 'COPPER26AUGFUT',
+        transaction_type: 'BUY' as const,
+        quantity: 1,
+        order_type: 'MARKET' as const,
+        product: 'NRML' as const,
+        price: 0,
+        market_protection: -1,
+      })),
+    });
+
+    const params = new URLSearchParams(body);
+    expect(params.get('type')).toBe('two-leg');
+    // `price` must be present and 0 rather than omitted — this is the shape a
+    // market GTT created from Kite web reads back as.
+    for (const order of JSON.parse(params.get('orders') ?? '[]')) {
+      expect(order).toMatchObject({ order_type: 'MARKET', price: 0, market_protection: -1 });
+    }
+  });
 });
 
 describe('alert serialisation', () => {

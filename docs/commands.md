@@ -627,16 +627,26 @@ Usage: kite gtt place [options] <instrument>
 Create a GTT trigger
 
 Arguments:
-  instrument           Instrument as EXCHANGE:SYMBOL
+  instrument                Instrument as EXCHANGE:SYMBOL
 
 Options:
-  -s, --side <side>    BUY or SELL
-  -q, --quantity <n>   Quantity
-  --trigger <price>    Trigger price (repeat for a two-leg OCO) (default: [])
-  --price <price>      Limit price for the resulting order (repeat for two-leg)
-                       (default: [])
-  --product <product>  Product (CNC, NRML, MIS, MTF) (default: "CNC")
-  -h, --help           display help for command
+  -s, --side <side>         BUY or SELL
+  -q, --quantity <n>        Quantity
+  --trigger <price>         Trigger price for a single-leg GTT (default: [])
+  --price <price>           Limit price for a single-leg GTT
+  --stoploss <price|pct%>   An OCO's stoploss trigger, as a price or a distance
+                            from the last price
+  --target <price|pct%>     An OCO's target trigger, as a price or a distance
+                            from the last price
+  --stoploss-price <price>  Limit price for the OCO's stoploss leg
+  --target-price <price>    Limit price for the OCO's target leg
+  -t, --order-type <type>   Order type placed when a trigger fires (LIMIT,
+                            MARKET)
+  --product <product>       Product (CNC, NRML, MIS, MTF); required on a
+                            derivatives exchange
+  --last-price <price>      Reference price for percentage triggers and the
+                            leg-direction check; never sent to Kite
+  -h, --help                display help for command
 ```
 
 ### `kite gtt delete`

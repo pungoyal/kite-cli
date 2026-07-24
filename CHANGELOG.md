@@ -8,6 +8,73 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **`kite gtt place --order-type MARKET`.** A GTT can now place a market order
+  when its trigger fires, not only a limit order — the same Limit/Market choice
+  Kite web offers. `LIMIT` is inferred whenever a limit price is given, so the
+  flag is only needed to ask for `MARKET`; it is never inferred from a *missing*
+  price, because a mistyped price flag turning into a market order is the one
+  failure this command must not have.
+
+  A market order has no limit price, so the **trigger** price is what prices it
+  for `trading.maxOrderValue` and the typed-confirmation threshold. Using the
+  `0` that goes on the wire would make an arbitrarily large order read as tiny
+  to both guards. The confirmation labels the figure `Est. value` rather than
+  `Max value` and says outright that it fills at whatever the book offers, and
+  `kite gtt get` renders such a leg as `at market` rather than `₹0.00`.
+
+  Zerodha's public GTT documentation only ever shows `LIMIT`, and one support
+  article states market GTTs cannot be placed at all. Both are out of date: the
+  wire format used here (`order_type: MARKET`, `price: 0`,
+  `market_protection: -1`) was verified by placing a market GTT through
+  `POST /gtt/triggers` and reading it back.
+
+- **Percentage triggers.** `--stoploss 2%` and `--target 2%` are measured from
+  `--last-price`, mirroring the `% of LTP` field in Kite web's own dialog. The
+  percentage is unsigned — which way to move follows from the leg and the side,
+  so there is no sign to get backwards.
+
+### Changed
+
+- **An OCO is now described by naming its legs: `--stoploss` and `--target`**,
+  each with its own `--stoploss-price` / `--target-price`. Kite only accepts a
+  two-leg GTT with one trigger either side of the current price, and which is
+  which follows from `--side`: a `BUY` OCO closes a short, so its stoploss sits
+  above the price and its target below; a `SELL` OCO closes a long and the two
+  swap. Because the legs are named, the CLI sorts `trigger_values` into the
+  ascending order Kite index-matches to `orders`, so the array order never
+  reaches the caller. Where `--last-price` is supplied, a leg on the wrong side
+  of it is refused up front rather than coming back from Kite as the
+  uninformative `Condition already met.`
+
+- **`--product` is required on `NFO`, `MCX`, `BFO`, `CDS`, `BCD` and `NCO`.**
+  It defaults to `CNC`, an equity-delivery product that is never right on a
+  derivatives contract, and a forgotten flag silently sent one that way.
+
+### Fixed
+
+- **`kite gtt place` no longer needs market-data permission, or any network
+  call of its own.** It used to fetch a quote purely to populate
+  `condition.last_price`, which meant an API key without a market-data
+  subscription could not place a GTT at all — the command died with
+  "Insufficient permission for that call." before reaching any placement logic.
+  Kite does not require that field and evaluates the condition against its own
+  feed regardless, so it is no longer sent. `--last-price` survives as an
+  optional reference for percentage triggers and the leg-direction check, and
+  is labelled in the confirmation as supplied rather than observed.
+
+### Breaking
+
+- Two `--trigger` values no longer describe an OCO; use `--stoploss` and
+  `--target`. The error names the replacement.
+- `--product` is required on derivatives exchanges rather than defaulting to
+  `CNC` there.
+- `GttParams.condition.last_price` is now optional, and
+  `GttParams.orders[].order_type` widens from `'LIMIT'` to `'LIMIT' | 'MARKET'`,
+  with an optional `market_protection`. Library callers passing a `last_price`
+  are unaffected; it is simply no longer sent by the CLI.
+
 ## [0.6.0] - 2026-07-23
 
 ### Added

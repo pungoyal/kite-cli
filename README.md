@@ -199,8 +199,13 @@ kite trades                            # today's fills
 
 kite gtt list
 kite gtt place NSE:INFY --side SELL --quantity 10 \
-  --trigger 1400 --price 1395 \
-  --trigger 1700 --price 1695          # two-leg OCO
+  --trigger 1700 --price 1695          # single trigger, one limit order
+kite gtt place NSE:INFY --side SELL --quantity 10 \
+  --stoploss 1400 --stoploss-price 1395 \
+  --target 1700 --target-price 1695    # OCO, both legs limit
+kite gtt place MCX:CRUDEOIL25AUGFUT --side BUY --quantity 1 --product NRML \
+  --stoploss 8826 --target 8479 \
+  --order-type MARKET                  # OCO, both legs at market
 kite gtt delete <id>
 
 kite alerts list                       # your price alerts

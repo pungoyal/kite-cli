@@ -601,22 +601,39 @@ export class KiteApi {
 // GTT serialisation
 // ---------------------------------------------------------------------------
 
+/**
+ * A GTT places one of these when its trigger fires. Kite accepts only LIMIT and
+ * MARKET here — the stop-loss types (SL, SL-M) make no sense for a GTT, whose
+ * trigger already is the stop.
+ */
+export type GttOrderType = 'LIMIT' | 'MARKET';
+export const GTT_ORDER_TYPES: GttOrderType[] = ['LIMIT', 'MARKET'];
+
 export interface GttParams {
   type: 'single' | 'two-leg';
   condition: {
     exchange: string;
     tradingsymbol: string;
     trigger_values: number[];
-    last_price: number;
+    /** Optional. Kite documents it but does not require it, and evaluates the
+     * condition against its own feed either way — a trigger placed without one
+     * comes back with Kite's own last price filled in. */
+    last_price?: number;
   };
   orders: Array<{
     exchange: string;
     tradingsymbol: string;
     transaction_type: TransactionType;
     quantity: number;
-    order_type: 'LIMIT';
+    order_type: GttOrderType;
     product: Product;
+    /** Zero for a MARKET leg — Kite stores and returns it that way, and the
+     * field is not optional on the wire. */
     price: number;
+    /** Kite's cap on how far a triggered MARKET order may slip, as a
+     * percentage. `-1` means "use the exchange default" and is what Kite itself
+     * writes for a market GTT created from Kite web. */
+    market_protection?: number;
   }>;
 }
 
