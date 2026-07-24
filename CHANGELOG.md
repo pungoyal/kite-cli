@@ -8,6 +8,8 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-24
+
 ### Added
 
 - **`kite gtt place --order-type MARKET`.** A GTT can now place a market order
@@ -305,7 +307,8 @@ provenance-backed release from CI).
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/pungoyal/kite-cli/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/pungoyal/kite-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/pungoyal/kite-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/pungoyal/kite-cli/compare/v0.3.0...v0.4.0
