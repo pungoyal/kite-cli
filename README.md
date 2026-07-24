@@ -28,7 +28,7 @@ $ kite holdings
   Day's change  +₹287.40
 ```
 
-**Documentation:** [command reference](https://pungoyal.github.io/kite-cli/commands) · [safety model](https://pungoyal.github.io/kite-cli/safety) · [configuration](https://pungoyal.github.io/kite-cli/configuration) · [troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) · [library API](https://pungoyal.github.io/kite-cli/api)
+**Documentation:** [command reference](https://pungoyal.github.io/kite-cli/commands) · [safety model](https://pungoyal.github.io/kite-cli/safety) · [configuration](https://pungoyal.github.io/kite-cli/configuration) · [scripting](https://pungoyal.github.io/kite-cli/scripting) · [troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) · [library API](https://pungoyal.github.io/kite-cli/api)
 
 ## Why you can trust it
 
@@ -188,33 +188,23 @@ not just the label you chose.
 ## Scripting
 
 Every command supports `--json`, writes data to stdout and everything else to
-stderr, and returns a meaningful exit code.
+stderr, and returns an exit code that says *what* went wrong — `3` for an expired
+session, `6` for insufficient margin, `13` for the kill switch, and so on.
 
 ```bash
 kite positions --json | jq '.[] | select(.pnl < 0) | .tradingsymbol'
 kite holdings --json | jq '[.[] | .pnl] | add'
+kite watch --holdings --json >> ticks.ndjson   # NDJSON, one object per tick
 
-kite whoami --json || kite login       # exit code 3 means "no session"
+kite whoami --json || kite login               # exit code 3 means "no session"
 ```
 
-| Code | Meaning |
-|-----:|---------|
-| 0 | Success |
-| 1 | Unclassified failure |
-| 2 | Bad usage — unknown flag, missing or invalid argument |
-| 3 | Not logged in, or the session expired |
-| 4 | Kite rejected the input |
-| 5 | Order rejected by the exchange |
-| 6 | Insufficient margin |
-| 7 | Insufficient holdings to sell |
-| 8 | Rate limited |
-| 9 | Kite or its upstream OMS is unreachable |
-| 10 | You declined a confirmation |
-| 11 | Confirmation required but the terminal is not interactive |
-| 12 | Holdings need depository authorisation — run `kite authorise` |
-| 13 | Blocked by the local kill switch or order value cap |
+Colour is disabled automatically when stdout is not a TTY (`NO_COLOR` is honoured
+too), and order commands refuse rather than proceed when there's no terminal to
+confirm at — pass `--yes` to opt in explicitly.
 
-`NO_COLOR` is honoured, and colour is disabled automatically when stdout is not a TTY.
+→ The full exit-code table, the JSON output contract, CI credentials, and
+recipes: [scripting & automation](https://pungoyal.github.io/kite-cli/scripting).
 
 ## Configuration
 
@@ -277,6 +267,7 @@ searchable site at **[pungoyal.github.io/kite-cli](https://pungoyal.github.io/ki
 - [Command reference](https://pungoyal.github.io/kite-cli/commands) — every command and flag, with worked examples, generated from `--help`.
 - [Safety model](https://pungoyal.github.io/kite-cli/safety) — kill switch, value cap, confirmation escalation, order-tag reconciliation.
 - [Configuration](https://pungoyal.github.io/kite-cli/configuration) — every config key and environment variable, with precedence.
+- [Scripting & automation](https://pungoyal.github.io/kite-cli/scripting) — the output contract, exit codes, CI credentials and recipes.
 - [MCP server](https://pungoyal.github.io/kite-cli/mcp) — the read-only server for LLM agents: its tools, setup, and why it exposes no writes.
 - [Troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) — symptom-first fixes for session expiry, rate limits and login issues.
 - [Library API](https://pungoyal.github.io/kite-cli/api) — the programmatic API surface.

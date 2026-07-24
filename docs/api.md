@@ -316,7 +316,7 @@ Every error this library raises deliberately extends `KiteCliError`
   input.
 - `NetworkError` — DNS/TCP/TLS/timeout failure below the HTTP layer.
 - `ExitCode` — the full enum of process exit codes this library and CLI
-  use, documented in the README's [exit code table](https://github.com/pungoyal/kite-cli#scripting).
+  use, documented in the [exit code table](scripting.md#exit-codes).
 
 ## Response schemas
 

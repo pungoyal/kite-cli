@@ -27,8 +27,8 @@ features:
     linkText: Credential storage
   - title: Built for scripting
     details: Every command speaks --json, writes data to stdout and everything else to stderr, and returns a meaningful exit code. Rate limits are paced and quotes batched for you.
-    link: /commands
-    linkText: Every command and flag
+    link: /scripting
+    linkText: Scripting & automation
   - title: A library too
     details: The same client, rate limiting, response validation, redaction, and error taxonomy are exported for programmatic use, without the CLI.
     link: /api
