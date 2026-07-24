@@ -44,7 +44,12 @@ While the version is `0.x`, minor releases may contain breaking changes.
   forwards instead of backwards. The site and the npm package now move together
   on the `v*` tag; pull requests and `main` still build the site as a
   dead-link gate, and a documentation fix can be published between releases by
-  running the workflow manually.
+  dispatching the workflow from the release tag.
+
+  Dispatching from `main` instead is guarded rather than forbidden: the job
+  installs the published CLI, regenerates the command reference from *its*
+  `--help`, and refuses to deploy if the checked-in reference differs. Prose
+  fixes go out; unreleased flags cannot ride along.
 
 - **The README is an introduction again, not a second copy of the reference.**
   It had grown a full config-key table, the multi-account walkthrough and
