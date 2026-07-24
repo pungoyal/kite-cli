@@ -73,8 +73,19 @@ The `Docs` workflow builds the site on every pull request and every push to
 but **deploys only on a `v*` release tag**. The published site therefore matches
 the published package: `docs/commands.md` is generated from `--help`, so
 deploying from `main` would advertise flags that `npm i -g @pungoyal/kite-cli`
-does not yet ship. To publish a documentation fix between releases, run the
-workflow by hand (**Actions → Docs → Run workflow**, from `main`).
+does not yet ship.
+
+To republish the site between releases, dispatch the workflow **from the release
+tag**, which carries exactly what was published:
+
+```bash
+gh workflow run Docs --ref v0.7.0
+```
+
+Dispatching from `main` is allowed but guarded: the job installs the published
+CLI, regenerates the command reference from *its* `--help`, and fails if the
+checked-in reference differs — so a prose fix goes out fine, while unreleased
+flags cannot ride along.
 
 Links from a docs page to source files or README sections use absolute
 `github.com` URLs (they live outside the site); links between docs pages stay as

@@ -69,6 +69,21 @@ jobs:
         run: npm run build
         working-directory: docs
 
+      # A manual deploy from a branch is the one path that can publish a command
+      # reference the released package does not match — the drift this workflow
+      # exists to prevent, reachable by one button. So check it rather than trust
+      # the operator: install the published CLI, regenerate the reference from
+      # *its* `--help`, and fail if what would be deployed differs. Dispatching
+      # from a `v*` tag needs no check — CI already proved the reference matches
+      # that tag's source.
+      - name: Verify the command reference matches the published CLI
+        if: github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          npm ci --ignore-scripts
+          npm install --prefix "$RUNNER_TEMP/published" --no-save --ignore-scripts @pungoyal/kite-cli@latest
+          KITE_DOCS_CLI="$RUNNER_TEMP/published/node_modules/@pungoyal/kite-cli/dist/cli.js" \
+            node scripts/generate-command-reference.mjs --check
+
       # Pages plumbing is only meaningful on a real deployment — a tag push or a
       # manual dispatch. A PR or a plain push to main stops at the build above.
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

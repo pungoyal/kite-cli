@@ -22,7 +22,11 @@ import stripAnsi from 'strip-ansi';
 const execFileAsync = promisify(execFile);
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const cli = join(root, 'dist', 'cli.js');
+// Normally the freshly built CLI in dist/. `KITE_DOCS_CLI` points it at another
+// binary — the docs deploy uses it to check the checked-in reference against the
+// *published* package, so a manual deploy cannot put flags on the site that the
+// released CLI does not have.
+const cli = process.env.KITE_DOCS_CLI ?? join(root, 'dist', 'cli.js');
 const outFile = join(root, 'docs', 'commands.md');
 
 const env = {
@@ -137,7 +141,11 @@ async function main() {
       existing = null;
     }
     if (existing !== content) {
-      console.error(`docs/commands.md is out of date. Run \`npm run docs:commands\` and commit the result.`);
+      console.error(
+        process.env.KITE_DOCS_CLI
+          ? `docs/commands.md does not match the help printed by ${cli}.`
+          : 'docs/commands.md is out of date. Run `npm run docs:commands` and commit the result.',
+      );
       process.exit(1);
     }
     console.log('docs/commands.md is up to date.');
