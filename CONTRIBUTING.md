@@ -2,6 +2,8 @@
 
 Thanks for your interest in kite-cli. This tool places real orders with real money, so the bar for changes is deliberately high — but the workflow is ordinary.
 
+Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Prerequisites
 
 - **Node 22.12 or newer** (`node -v`).

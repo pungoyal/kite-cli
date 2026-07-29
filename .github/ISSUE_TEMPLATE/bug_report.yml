@@ -1,0 +1,77 @@
+name: Bug report
+description: Something in kite-cli behaved incorrectly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. **Never paste an API secret, access token, or `--debug` output that hasn't been reviewed for one** — `--debug` redacts known secret shapes, but treat that as a safety net, not a guarantee.
+
+        Found a security issue instead (credential leakage, a safety-layer bypass, a way to place an order you didn't confirm)? Please use [SECURITY.md](https://github.com/pungoyal/kite-cli/blob/main/SECURITY.md) instead of a public issue.
+
+  - type: input
+    id: version
+    attributes:
+      label: kite-cli version
+      description: Output of `kite --version`
+      placeholder: "0.8.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: Output of `node -v`
+      placeholder: "v22.12.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other (specify below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran, with any real order/instrument details replaced by placeholders.
+      placeholder: kite orders place NSE:INFY -s BUY -q 10 -t LIMIT -p 1500
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include the exact error message or output. Redact anything that looks like a token, secret, or order ID you don't want public.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Does it reproduce with --dry-run, or only against a live account?
+      description: If it only reproduces live, note that — some bugs (e.g. rate-limit pacing) don't show up in --dry-run.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Config overrides, profile setup, or anything unusual about your environment.

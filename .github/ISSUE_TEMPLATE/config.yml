@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/pungoyal/kite-cli/security/advisories/new
+    about: Credential leakage, a safety-layer bypass, or anything else in scope for SECURITY.md — please don't file a public issue for these.
+  - name: Kite Connect API question
+    url: https://kite.trade/forum/
+    about: Questions about the underlying Kite Connect API itself (not this CLI) belong on Zerodha's developer forum.
