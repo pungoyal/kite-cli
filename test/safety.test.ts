@@ -230,6 +230,197 @@ describe('order value cap', () => {
   });
 });
 
+describe('--autoslice', () => {
+  it('sends autoslice=true to Kite and notes it in the preview', async () => {
+    await seedSession();
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    pool.intercept({ path: '/charges/orders', method: 'POST' }).reply(200, {
+      status: 'success',
+      data: [{ tradingsymbol: 'INFY', exchange: 'NSE', charges: { total: 12.5 } }],
+    });
+
+    let sentAutoslice: string | null = null;
+    pool.intercept({ path: '/orders/regular', method: 'POST' }).reply((opts) => {
+      sentAutoslice = new URLSearchParams(String(opts.body)).get('autoslice');
+      return {
+        statusCode: 200,
+        data: { status: 'success', data: [{ order_id: '1' }, { order_id: '2' }] },
+      };
+    });
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '3600',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--autoslice',
+      '--yes',
+    ]);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(sentAutoslice).toBe('true');
+    expect(err).toMatch(/autoslice/i);
+    // Both slices' order ids are reported.
+    expect(out || err).toMatch(/1/);
+  });
+
+  it('omits autoslice from the form body when the flag is not passed', async () => {
+    await seedSession();
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    pool.intercept({ path: '/charges/orders', method: 'POST' }).reply(200, {
+      status: 'success',
+      data: [{ tradingsymbol: 'INFY', exchange: 'NSE', charges: { total: 12.5 } }],
+    });
+
+    let sentAutoslice: string | null = 'unset';
+    pool.intercept({ path: '/orders/regular', method: 'POST' }).reply((opts) => {
+      sentAutoslice = new URLSearchParams(String(opts.body)).get('autoslice');
+      return { statusCode: 200, data: { status: 'success', data: { order_id: '1' } } };
+    });
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--yes',
+    ]);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(sentAutoslice).toBeNull();
+  });
+
+  it('sets a non-zero exit code when some slices fail', async () => {
+    await seedSession();
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    pool.intercept({ path: '/charges/orders', method: 'POST' }).reply(200, {
+      status: 'success',
+      data: [{ tradingsymbol: 'INFY', exchange: 'NSE', charges: { total: 12.5 } }],
+    });
+    pool.intercept({ path: '/orders/regular', method: 'POST' }).reply(200, {
+      status: 'success',
+      data: [{ order_id: '1' }, { error: { code: 400, error_type: 'MarginException', message: 'Insufficient funds' } }],
+    });
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '3600',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--autoslice',
+      '--yes',
+    ]);
+
+    expect(code).toBe(ExitCode.Order);
+    expect(err).toMatch(/insufficient funds/i);
+  });
+});
+
+describe('pre-trade charges preview', () => {
+  it('shows the estimated charges alongside the estimated value', async () => {
+    await seedSession();
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    let sentCharges: unknown;
+    pool.intercept({ path: '/charges/orders', method: 'POST' }).reply((opts) => {
+      sentCharges = JSON.parse(String(opts.body));
+      return {
+        statusCode: 200,
+        data: { status: 'success', data: [{ tradingsymbol: 'INFY', exchange: 'NSE', charges: { total: 42.75 } }] },
+      };
+    });
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--dry-run',
+    ]);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(err).toMatch(/Est\. charges/);
+    expect(err).toMatch(/42\.75/);
+    expect(sentCharges).toMatchObject([{ exchange: 'NSE', tradingsymbol: 'INFY', quantity: 10, average_price: 1500 }]);
+  });
+
+  it('shows the charges as unknown, without blocking the order, when the lookup fails', async () => {
+    await seedSession();
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    pool.intercept({ path: '/charges/orders', method: 'POST' }).reply(503, {
+      status: 'error',
+      message: 'Backend unavailable',
+      error_type: 'GeneralException',
+    });
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '10',
+      '--type',
+      'LIMIT',
+      '--price',
+      '1500',
+      '--dry-run',
+    ]);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(err).toMatch(/Est\. charges/);
+    expect(err).toMatch(/unknown/);
+  });
+});
+
 describe('the value cap fails closed', () => {
   /**
    * The cap must not silently stop applying when the price lookup fails. The

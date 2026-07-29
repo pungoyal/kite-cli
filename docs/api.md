@@ -103,7 +103,10 @@ const api = new KiteApi(client);
 - **Margins & charges**: `orderMargins(orders)`,
   `basketMargins(orders, considerPositions?)`, `orderCharges(orders)`.
 - **Mutual funds** (read-only over the API): `getMfHoldings()`,
-  `getMfOrders()`, `getMfSips()`.
+  `getMfOrders()`, `getMfOrder(orderId)` (irrespective of age, unlike
+  `getMfOrders()`'s 7-day window), `getMfSips()`, `getMfInstrumentsCsv()`
+  (the Coin-supported fund master, as raw CSV — see `MfInstrumentStore`
+  below).
 
 Every mutating method (`placeOrder`, `modifyOrder`, `cancelOrder`,
 `placeGtt`, `modifyGtt`, `deleteGtt`, `createAlert`, `modifyAlert`,
@@ -125,6 +128,14 @@ const order = await api.placeOrder({
   tag: 'my-app-order-1',
 });
 ```
+
+`PlaceOrderParams.autoslice` (boolean, default `false`) auto-splits an order
+into up to 10 child orders when its quantity exceeds the exchange's freeze
+limit, instead of a single rejection. When it does, `placeOrder` resolves to
+an array — one entry per slice, each either `{ order_id }` or
+`{ error: { code, error_type, message } }` — rather than the single-order
+shape; see `commands/orders.ts` for how the CLI's own `orders place
+--autoslice` handles the mixed success/error array.
 
 `core/api.ts` also has internal helpers (`parseInterval`, `splitDateRange`,
 `chunks`, `formatIstDateTime`) that the CLI's own commands use for interval
@@ -257,7 +268,7 @@ Loads and caches the Kite instrument master, and resolves
 — never the reverse, since exchanges reuse tokens after expiry.
 
 ```ts
-const instruments = new InstrumentStore(api, 'production');
+const instruments = new InstrumentStore(api);
 await instruments.load();
 const infy = instruments.lookup('NSE', 'INFY');
 const token = instruments.requireToken('NSE:INFY'); // throws if unresolved
@@ -274,6 +285,24 @@ Free functions: `parseInstrumentKey(value)` splits an
 CSV Kite serves the instrument master as. (The reverse,
 `formatInstrumentKey`, exists in `core/instruments.ts` but is not
 re-exported from `src/index.ts`.)
+
+## `MfInstrumentStore`
+
+The mutual fund equivalent of `InstrumentStore`, over the separate MF
+instrument dump (`getMfInstrumentsCsv()`). Kite's MF `tradingsymbol` is the
+scheme's ISIN, not a ticker — there is no exchange to pair it with, so this
+is keyed and searched on ISIN and fund name instead:
+
+```ts
+const mfInstruments = new MfInstrumentStore(api);
+await mfInstruments.load();
+const fund = mfInstruments.lookup('INF879O01027'); // by ISIN
+const matches = mfInstruments.search('parag parikh', { plan: 'direct' });
+```
+
+Same shape as `InstrumentStore`: `load({ force?, signal? })` (daily cache),
+`lookup(tradingsymbol)`, `search(query, { amc?, plan?, limit? })`, `size`.
+Free function: `parseMfInstrumentsCsv(csv)`.
 
 ## `RateLimiter`
 

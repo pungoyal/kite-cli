@@ -47,6 +47,10 @@ export {
   type McpTool,
 } from './core/mcp.js';
 export {
+  MfInstrumentStore,
+  parseMfInstrumentsCsv,
+} from './core/mfInstruments.js';
+export {
   DEFAULT_PROFILE,
   getProfile,
   listProfileNames,

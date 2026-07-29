@@ -4,6 +4,7 @@ import { type Config, ENDPOINTS, type Endpoints, loadConfig } from './core/confi
 import { getSecret } from './core/credentials.js';
 import { AuthRequiredError, ExitCode, KiteCliError } from './core/errors.js';
 import { InstrumentStore } from './core/instruments.js';
+import { MfInstrumentStore } from './core/mfInstruments.js';
 import { type ResolvedProfile, resolveProfile, resolveTradingConfig, storagePrefixFor } from './core/profiles.js';
 import { RateLimiter } from './core/ratelimit.js';
 import { registerSecret } from './core/redact.js';
@@ -40,6 +41,7 @@ export interface Context {
   client: KiteClient;
   api: KiteApi;
   instruments: InstrumentStore;
+  mfInstruments: MfInstrumentStore;
   session: SessionMeta | null;
   options: GlobalOptions;
   signal: AbortSignal;
@@ -102,6 +104,7 @@ export async function createContext(
 
   const api = new KiteApi(client);
   const instruments = new InstrumentStore(api);
+  const mfInstruments = new MfInstrumentStore(api);
 
   const requireSession = (): SessionMeta => {
     if (!client.hasSession()) {
@@ -149,6 +152,7 @@ export async function createContext(
     client,
     api,
     instruments,
+    mfInstruments,
     session,
     options,
     signal,

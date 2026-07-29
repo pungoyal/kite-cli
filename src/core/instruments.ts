@@ -159,8 +159,14 @@ function numberOrUndefined(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** The instrument dump regenerates daily around 08:30 IST. */
-function isStale(fetchedAt: string, now: Date = new Date()): boolean {
+/**
+ * True once a daily dump fetched at `fetchedAt` is due for a refresh.
+ *
+ * Shared with {@link MfInstrumentStore} in mfInstruments.ts: the MF dump
+ * follows the same "regenerated once a day" cadence as the equity one, so the
+ * boundary logic is identical even though the two dumps have unrelated shapes.
+ */
+export function isStale(fetchedAt: string, now: Date = new Date()): boolean {
   const fetched = Date.parse(fetchedAt);
   if (Number.isNaN(fetched)) return true;
 

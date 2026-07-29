@@ -65,6 +65,14 @@ export interface PlaceOrderParams {
   auction_number?: string | undefined;
   market_protection?: number | undefined;
   /**
+   * Auto-split into multiple orders (max 10 slices) when quantity exceeds the
+   * exchange's freeze limit. Kite defaults this to false. The response shape
+   * is the same array-of-order-or-error either way a slice can fail
+   * independently, so `placeOrder`'s caller already handles it — see
+   * `placeOrder` in commands/orders.ts.
+   */
+  autoslice?: boolean | undefined;
+  /**
    * Client correlation ID, max 20 alphanumeric chars. This CLI always sets one:
    * it is the only way to reconcile after a network failure, because Kite has
    * no idempotency key.
@@ -587,11 +595,29 @@ export class KiteApi {
     });
   }
 
+  /** A single MF order, irrespective of age — unlike {@link getMfOrders}. */
+  async getMfOrder(orderId: string, signal?: AbortSignal) {
+    return this.client.request({
+      method: 'GET',
+      path: `/mf/orders/${encodeURIComponent(orderId)}`,
+      schema: MfOrderSchema,
+      signal,
+    });
+  }
+
   async getMfSips(signal?: AbortSignal) {
     return this.client.request({
       method: 'GET',
       path: '/mf/sips',
       schema: z.array(MfSipSchema),
+      signal,
+    });
+  }
+
+  /** The MF instrument dump (Coin-supported funds) as raw CSV. Not an API envelope. */
+  async getMfInstrumentsCsv(signal?: AbortSignal): Promise<string> {
+    return this.client.requestText({
+      path: '/mf/instruments',
       signal,
     });
   }

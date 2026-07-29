@@ -53,6 +53,11 @@ export function instrumentsCacheFile(): string {
   return join(cacheDir(), 'instruments.json');
 }
 
+/** Mutual fund instrument master cache, refreshed daily. */
+export function mfInstrumentsCacheFile(): string {
+  return join(cacheDir(), 'mf-instruments.json');
+}
+
 /** Create a directory with 0700 so secrets are not world-readable. */
 export async function ensurePrivateDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true, mode: 0o700 });

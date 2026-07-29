@@ -532,6 +532,28 @@ export const MfOrderSchema = z.looseObject({
 });
 export type MfOrder = z.infer<typeof MfOrderSchema>;
 
+/** One row of the MF instrument master (Coin-supported funds), one per plan/dividend-type combo. */
+export const MfInstrumentSchema = z.looseObject({
+  /** Kite's MF "tradingsymbol" is the scheme's ISIN, not a ticker. */
+  tradingsymbol: z.string(),
+  amc: z.string().optional(),
+  name: z.string().optional(),
+  purchase_allowed: z.boolean().optional(),
+  redemption_allowed: z.boolean().optional(),
+  minimum_purchase_amount: z.number().optional(),
+  purchase_amount_multiplier: z.number().optional(),
+  minimum_additional_purchase_amount: z.number().optional(),
+  minimum_redemption_quantity: z.number().optional(),
+  redemption_quantity_multiplier: z.number().optional(),
+  dividend_type: z.string().optional(),
+  scheme_type: z.string().optional(),
+  plan: z.string().optional(),
+  settlement_type: z.string().optional(),
+  last_price: z.number().optional(),
+  last_price_date: z.string().optional(),
+});
+export type MfInstrument = z.infer<typeof MfInstrumentSchema>;
+
 export const MfSipSchema = z.looseObject({
   sip_id: z.string(),
   tradingsymbol: z.string().optional(),

@@ -254,7 +254,7 @@ terminal, by design.
 - **Order acceptance is not execution.** A returned order ID means the OMS accepted the request; check `kite orders get <id>` for what actually happened.
 - **Rate limits are tight**: quotes 1/sec, historical 3/sec, orders 10/sec (plus 400/min and 5,000/day). The CLI paces requests and batches quotes for you.
 - **Historical data is a paid add-on** — a 403 there is a permission problem, not an expired session.
-- **Mutual funds are read-only** over the API, and `mf orders` only reaches back 7 days.
+- **Mutual funds are read-only** over the API, and `mf orders` only reaches back 7 days (`mf orders get <id>` doesn't).
 
 → Symptom-first fixes for all of these:
 [the troubleshooting guide](https://pungoyal.github.io/kite-cli/troubleshooting).
@@ -306,7 +306,7 @@ npm run build
 
 ## Contributing
 
-Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](https://github.com/pungoyal/kite-cli/blob/main/CONTRIBUTING.md) for the development workflow and the three non-negotiables (safety defaults, secret redaction, no blind retries of writes), and [CHANGELOG.md](https://github.com/pungoyal/kite-cli/blob/main/CHANGELOG.md) for release history. Security issues go through [SECURITY.md](https://github.com/pungoyal/kite-cli/blob/main/SECURITY.md), never a public issue.
+Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](https://github.com/pungoyal/kite-cli/blob/main/CONTRIBUTING.md) for the development workflow and the three non-negotiables (safety defaults, secret redaction, no blind retries of writes), and [CHANGELOG.md](https://github.com/pungoyal/kite-cli/blob/main/CHANGELOG.md) for release history. Security issues go through [SECURITY.md](https://github.com/pungoyal/kite-cli/blob/main/SECURITY.md), never a public issue. Participation is governed by the [Code of Conduct](https://github.com/pungoyal/kite-cli/blob/main/CODE_OF_CONDUCT.md).
 
 ## Disclaimer
 

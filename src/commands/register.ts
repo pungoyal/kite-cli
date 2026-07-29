@@ -56,6 +56,7 @@ export async function registerCommands(program: Command, run: Runner): Promise<v
   const { doctorCommands } = await import('./doctor.js');
   const { completionCommands } = await import('./completion.js');
   const { mcpCommands } = await import('./mcp.js');
+  const { postbackCommands } = await import('./postback.js');
 
   // commandsGroup applies to every command registered after it, so the group
   // is set immediately before each block. With ~25 commands this is the
@@ -84,6 +85,7 @@ export async function registerCommands(program: Command, run: Runner): Promise<v
 
   program.commandsGroup('Integrations:');
   mcpCommands(program, run);
+  postbackCommands(program, run);
 
   program.commandsGroup('Settings:');
   configCommands(program, run);

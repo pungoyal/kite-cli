@@ -44,7 +44,7 @@ never has to branch on the flag that was passed.
 | 1 | `Failure` | Unclassified failure |
 | 2 | `Usage` | Bad usage — unknown flag, missing or invalid argument |
 | 3 | `Auth` | Not logged in, or the session expired |
-| 4 | `Input` | Kite rejected the input |
+| 4 | `Input` | Kite rejected the input, or a local check on it failed (e.g. `postback verify` on a mismatched checksum) |
 | 5 | `Order` | Order rejected by the exchange's OMS |
 | 6 | `Margin` | Insufficient margin |
 | 7 | `Holding` | Insufficient holdings to sell |

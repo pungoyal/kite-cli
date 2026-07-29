@@ -92,6 +92,7 @@ export const orderCommands: CommandFactory = (program, run) => {
     .option('--disclosed-quantity <n>', 'Disclosed quantity')
     .option('--iceberg-legs <n>', 'Number of iceberg legs (2-50)')
     .option('--iceberg-quantity <n>', 'Quantity per iceberg leg')
+    .option('--autoslice', 'Auto-split into up to 10 orders if quantity exceeds the exchange freeze limit')
     .option('--tag <tag>', 'Custom tag, max 20 alphanumeric characters')
     .addHelpText(
       'after',
@@ -114,6 +115,10 @@ export const orderCommands: CommandFactory = (program, run) => {
         ],
         ['kite orders place NSE:INFY -s BUY -q 10 --variety amo', 'After-market order for the next session'],
         ['kite orders place NSE:INFY -s BUY -q 10 --tag rebalance', 'Tag it, so `orders reconcile` can find it'],
+        [
+          'kite orders place NFO:NIFTY25AUGFUT -s BUY -q 3600 --product NRML --autoslice',
+          'Above the exchange freeze limit: split into up to 10 orders automatically',
+        ],
       ]),
     )
     .action(run(placeOrder));
@@ -342,6 +347,7 @@ const PlaceOptionsSchema = z.object({
   disclosedQuantity: z.coerce.number().int().nonnegative().optional(),
   icebergLegs: z.coerce.number().int().min(2).max(50).optional(),
   icebergQuantity: z.coerce.number().int().positive().optional(),
+  autoslice: z.boolean().optional(),
   tag: z
     .string()
     .max(20)
@@ -417,6 +423,36 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
   }
   const notionalValue = referencePrice !== undefined ? referencePrice * opts.quantity : undefined;
 
+  // --- pre-trade charges preview -------------------------------------------
+  // Best-effort, like the LTP lookup above: brokerage/STT/GST are real money
+  // that "Est. value" alone hides, but a failure here (unsupported segment,
+  // rate limit) must never block placing the order — this is a preview, not a
+  // safety check.
+  let estimatedCharges: number | undefined;
+  if (referencePrice !== undefined && referencePrice > 0) {
+    try {
+      const [charge] = await ctx.api.orderCharges(
+        [
+          {
+            order_id: '1',
+            exchange: instrument.exchange,
+            tradingsymbol: instrument.tradingsymbol,
+            transaction_type: side,
+            variety,
+            product,
+            order_type: orderType,
+            quantity: opts.quantity,
+            average_price: referencePrice,
+          },
+        ],
+        ctx.signal,
+      );
+      estimatedCharges = charge?.charges?.total;
+    } catch {
+      // Silently omitted from the preview below.
+    }
+  }
+
   // A unique tag is ALWAYS set, even when the user supplied one. Kite has no
   // idempotency key, so this is the only way to tell "the request failed" from
   // "the request succeeded but the response was lost" — and a non-unique tag
@@ -467,6 +503,22 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
         label: 'Est. value',
         value: notionalValue !== undefined ? rupees(notionalValue) : ctx.io.dim('unknown (no quote available)'),
       },
+      ...(referencePrice !== undefined
+        ? [
+            {
+              label: 'Est. charges',
+              value: estimatedCharges !== undefined ? rupees(estimatedCharges) : ctx.io.dim('unknown'),
+            },
+          ]
+        : []),
+      ...(opts.autoslice
+        ? [
+            {
+              label: 'Autoslice',
+              value: 'enabled — may split into up to 10 orders if quantity exceeds the exchange freeze limit',
+            },
+          ]
+        : []),
       { label: 'Tag', value: tag },
     ],
   });
@@ -488,6 +540,7 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
     validity_ttl: opts.validityTtl,
     iceberg_legs: opts.icebergLegs,
     iceberg_quantity: opts.icebergQuantity,
+    autoslice: opts.autoslice,
     tag,
   };
 

@@ -8,6 +8,37 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **`--autoslice` on `orders place`.** Kite auto-splits an order into up to 10
+  child orders when its quantity exceeds the exchange's freeze limit, instead
+  of rejecting it outright. The confirmation preview now says so explicitly,
+  since a sliced order can partially fail — some legs placed, others
+  rejected — which the existing per-slice success/error handling in the
+  placement response already accounted for.
+
+- **A pre-trade charges estimate on `orders place`.** The confirmation now
+  shows `Est. charges` (brokerage, STT, GST, stamp duty) alongside `Est.
+  value`, computed with the same `/charges/orders` endpoint `kite margins
+  charges` already uses. Best-effort: a failed lookup shows "unknown" rather
+  than blocking the order, the same fallback already used for the value
+  estimate itself.
+
+- **`kite mf orders get <order-id>`**, alongside the existing 7-day `mf
+  orders` list. Kite's single-order endpoint returns a fund order regardless
+  of its age, which the list endpoint cannot.
+
+- **`kite mf instruments search`/`refresh`**, mirroring the equity
+  `instruments search`/`refresh` pair. Kite's MF instrument master is a
+  separate CSV dump, keyed by ISIN rather than exchange:tradingsymbol, cached
+  on the same daily cadence as the equity dump.
+
+- **`kite postback verify`**, wrapping the existing (previously
+  library-only) `verifyPostbackChecksum` for anyone building a receiver for
+  Kite's order postbacks. Reads a JSON payload from a file or stdin, recomputes
+  the checksum against the stored API secret, and exits non-zero on a
+  mismatch. Makes no network call.
+
 ## [0.8.0] - 2026-07-24
 
 ### Added

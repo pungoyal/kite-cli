@@ -71,6 +71,7 @@ Streaming:
 Integrations:
   mcp                               Run a read-only MCP server over stdio for
                                     LLM agents (Claude and others)
+  postback                          Verify a Kite postback payload
 
 Settings:
   config                            View and change CLI settings
@@ -380,8 +381,10 @@ Options:
 
 Commands:
   holdings        Show your mutual fund holdings
-  orders          Show mutual fund orders from the last 7 days
+  orders          View mutual fund orders
   sips            Show your mutual fund SIPs
+  instruments     Browse the mutual fund instrument master (Coin-supported
+                  funds)
   help [command]  display help for command
 
 Examples:
@@ -409,7 +412,27 @@ Examples:
 ### `kite mf orders`
 
 ```
-Usage: kite mf orders [options]
+Usage: kite mf orders [options] [command]
+
+View mutual fund orders
+
+Options:
+  -h, --help      display help for command
+
+Commands:
+  list            Show mutual fund orders from the last 7 days
+  get <order-id>  Show a single mutual fund order, regardless of age
+  help [command]  display help for command
+
+Examples:
+  $ kite mf orders                       Recent purchases and redemptions (list is the default)
+  $ kite mf orders get 1234567890123456  One order, regardless of age
+```
+
+#### `kite mf orders list`
+
+```
+Usage: kite mf orders list [options]
 
 Show mutual fund orders from the last 7 days
 
@@ -418,6 +441,20 @@ Options:
 
 Examples:
   $ kite mf orders  Recent purchases and redemptions
+```
+
+#### `kite mf orders get`
+
+```
+Usage: kite mf orders get [options] <order-id>
+
+Show a single mutual fund order, regardless of age
+
+Options:
+  -h, --help  display help for command
+
+Examples:
+  $ kite mf orders get 1234567890123456  Unlike the list, this reaches back further than 7 days
 ```
 
 ### `kite mf sips`
@@ -432,6 +469,65 @@ Options:
 
 Examples:
   $ kite mf sips  Every SIP, its instalment and next due date
+```
+
+### `kite mf instruments`
+
+```
+Usage: kite mf instruments [options] [command]
+
+Browse the mutual fund instrument master (Coin-supported funds)
+
+Options:
+  -h, --help                display help for command
+
+Commands:
+  search [options] <query>  Search mutual fund schemes by name
+  refresh                   Re-download the mutual fund instrument master
+  help [command]            display help for command
+
+Examples:
+  $ kite mf instruments search "parag parikh"  Find a fund to use elsewhere
+  $ kite mf instruments refresh                Re-download after new listings
+```
+
+#### `kite mf instruments search`
+
+```
+Usage: kite mf instruments search [options] <query>
+
+Search mutual fund schemes by name
+
+Arguments:
+  query            Search text, e.g. "parag parikh flexi cap"
+
+Options:
+  --amc <amc>      Filter by AMC, e.g. ParagParikhMutualFund_MF
+  --plan <plan>    Filter by plan, e.g. direct, regular
+  -n, --limit <n>  Maximum results (default: "25")
+  -h, --help       display help for command
+
+Examples:
+  $ kite mf instruments search "nifty 50 index"
+      Every index fund matching that name
+  $ kite mf instruments search "small cap" --plan direct
+      Direct plans only
+  $ kite mf instruments search axis --amc AxisMutualFund_MF
+      One AMC only
+```
+
+#### `kite mf instruments refresh`
+
+```
+Usage: kite mf instruments refresh [options]
+
+Re-download the mutual fund instrument master
+
+Options:
+  -h, --help  display help for command
+
+Examples:
+  $ kite mf instruments refresh  Refresh the cached fund list
 ```
 
 ## `kite quote`
@@ -693,6 +789,8 @@ Options:
   --disclosed-quantity <n>  Disclosed quantity
   --iceberg-legs <n>        Number of iceberg legs (2-50)
   --iceberg-quantity <n>    Quantity per iceberg leg
+  --autoslice               Auto-split into up to 10 orders if quantity exceeds
+                            the exchange freeze limit
   --tag <tag>               Custom tag, max 20 alphanumeric characters
   -h, --help                display help for command
 
@@ -715,6 +813,8 @@ Examples:
       After-market order for the next session
   $ kite orders place NSE:INFY -s BUY -q 10 --tag rebalance
       Tag it, so `orders reconcile` can find it
+  $ kite orders place NFO:NIFTY25AUGFUT -s BUY -q 3600 --product NRML --autoslice
+      Above the exchange freeze limit: split into up to 10 orders automatically
 ```
 
 ### `kite orders modify`
@@ -1258,6 +1358,44 @@ Examples:
   $ kite mcp                         Usually launched by the client, not typed by hand
   $ claude mcp add kite -- kite mcp  Register the server with Claude Code
   $ kite --profile huf mcp           Serve a specific account
+```
+
+## `kite postback`
+
+```
+Usage: kite postback [options] [command]
+
+Verify a Kite postback payload
+
+Options:
+  -h, --help      display help for command
+
+Commands:
+  verify [file]   Verify a postback payload's checksum against your stored API
+                  secret
+  help [command]  display help for command
+
+Examples:
+  $ kite postback verify < payload.json  Is this webhook body genuine?
+```
+
+### `kite postback verify`
+
+```
+Usage: kite postback verify [options] [file]
+
+Verify a postback payload's checksum against your stored API secret
+
+Arguments:
+  file        Path to a JSON file; reads stdin if omitted
+
+Options:
+  -h, --help  display help for command
+
+Examples:
+  $ kite postback verify < payload.json       Pipe your receiver's raw request body in
+  $ kite postback verify payload.json         Or read it from a file
+  $ kite postback verify payload.json --json  Machine-readable verdict, for a webhook handler
 ```
 
 ## `kite config`
