@@ -8,6 +8,26 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A retryable HTTP status is no longer reported as a network failure.** Kite
+  answering 429, 500, 502, 503 or 504 surfaced as `NetworkError: Could not reach
+  Kite: fetch failed: Request failed` with the hint "Check your network
+  connection" and exit code 9, discarding the status code entirely. The
+  connection was fine — undici's retry interceptor defaults to
+  `throwOnError: true`, which converts those statuses into a `RequestRetryError`
+  rather than passing the response downstream, and `fetch` rewraps that as
+  `TypeError: fetch failed`. Most visible on writes, which are never
+  auto-retried and so hit the terminal case immediately (reported against `kite
+  gtt delete`), but reads were affected too once retries were exhausted.
+
+  These now raise a `KiteApiError` carrying the real status, Kite's own message
+  and `error_type`, and the appropriate hint — so a 503 says Zerodha's OMS is
+  unavailable and exits `10`, and a 429 says rate-limited. Library consumers
+  branching on `instanceof KiteApiError` no longer miss these five statuses.
+  Retry behaviour itself is unchanged: reads still retry with backoff and
+  `Retry-After`, and writes still never auto-retry.
+
 ## [0.9.0] - 2026-07-29
 
 ### Added

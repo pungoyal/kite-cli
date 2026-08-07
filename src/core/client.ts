@@ -64,24 +64,51 @@ type FetchResponse = Awaited<ReturnType<typeof fetch>>;
  * is no idempotency key anywhere in the API, so an automatic retry of a mutating
  * verb is a real-money bug. We retry reads only; every write is retried
  * deliberately by the caller, or not at all.
+ *
+ * `throwOnError: false` is load-bearing, not a stylistic choice. Under undici's
+ * default (`true`), a response whose status is in `statusCodes` is converted to
+ * a `RequestRetryError` and the body is never handed downstream. The retry
+ * gating itself still works either way — the error takes a longer route, via
+ * `onResponseEnd` rethrowing into `onResponseError`, which does consult
+ * `methods` — but the terminal outcome is wrong: once retries are exhausted (or
+ * refused, as for every write here), that error escapes to `fetch`, which
+ * rewraps it as `TypeError: fetch failed`. We then classified it by exclusion as
+ * a NetworkError: a 503 from Kite's OMS was reported as "Could not reach Kite.
+ * Check your network connection.", with the status code discarded.
+ *
+ * With `false`, the response is passed downstream instead, so `handleResponse`
+ * sees the real status AND Kite's own error envelope — a 503 surfaces as a
+ * KiteApiError carrying Kite's message and error_type, not a synthesised one.
  */
+const RETRY_OPTIONS: Parameters<typeof interceptors.retry>[0] = {
+  maxRetries: 3,
+  minTimeout: 300,
+  maxTimeout: 5_000,
+  timeoutFactor: 2,
+  retryAfter: true,
+  throwOnError: false,
+  methods: ['GET', 'HEAD'],
+  statusCodes: [429, 500, 502, 503, 504],
+  errorCodes: ['ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'ENETDOWN', 'ENETUNREACH', 'EPIPE'],
+};
+
+/**
+ * Apply the retry policy to a dispatcher. Exported so tests can compose the
+ * REAL policy onto a MockAgent — `setDispatcher` replaces the whole stack, so a
+ * bare MockAgent exercises no retry behaviour at all.
+ */
+export function withRetryPolicy(base: Dispatcher): Dispatcher {
+  return base.compose(interceptors.retry(RETRY_OPTIONS));
+}
+
 function createDispatcher(): Dispatcher {
-  return new Agent({
-    connectTimeout: 5_000,
-    headersTimeout: 15_000,
-    bodyTimeout: 30_000,
-    keepAliveTimeout: 10_000,
-    connections: 8,
-  }).compose(
-    interceptors.retry({
-      maxRetries: 3,
-      minTimeout: 300,
-      maxTimeout: 5_000,
-      timeoutFactor: 2,
-      retryAfter: true,
-      methods: ['GET', 'HEAD'],
-      statusCodes: [429, 500, 502, 503, 504],
-      errorCodes: ['ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'ENETDOWN', 'ENETUNREACH', 'EPIPE'],
+  return withRetryPolicy(
+    new Agent({
+      connectTimeout: 5_000,
+      headersTimeout: 15_000,
+      bodyTimeout: 30_000,
+      keepAliveTimeout: 10_000,
+      connections: 8,
     }),
   );
 }
@@ -95,6 +122,26 @@ function dispatcher(): Dispatcher {
 /** Test hook: swap the dispatcher, e.g. for an undici MockAgent. */
 export function setDispatcher(d: Dispatcher | undefined): void {
   sharedDispatcher = d;
+}
+
+/**
+ * Find an undici `RequestRetryError` in a thrown error's `cause` chain.
+ *
+ * Duck-typed on `code` rather than `instanceof`: the error may originate from a
+ * different copy of undici than the one we imported, and only the code and
+ * `statusCode` are contractual for us.
+ */
+function findRequestRetryError(err: unknown): { statusCode: number } | undefined {
+  let current: unknown = err;
+  // Bounded — a malformed cause chain must not hang error reporting.
+  for (let depth = 0; current !== null && typeof current === 'object' && depth < 8; depth += 1) {
+    const candidate = current as { code?: unknown; statusCode?: unknown; cause?: unknown };
+    if (candidate.code === 'UND_ERR_REQ_RETRY' && typeof candidate.statusCode === 'number') {
+      return { statusCode: candidate.statusCode };
+    }
+    current = candidate.cause;
+  }
+  return undefined;
 }
 
 export class KiteClient {
@@ -237,6 +284,22 @@ export class KiteClient {
     if (err instanceof Error && err.name === 'AbortError') {
       return new KiteCliError('Cancelled.', ExitCode.Aborted);
     }
+    const retried = findRequestRetryError(err);
+    if (retried) {
+      // A RequestRetryError only exists because a response ARRIVED with a status
+      // code — Kite answered, and answered badly. Reporting that as "could not
+      // reach Kite" would send the user to debug their network, and would hide
+      // the status from callers branching on `instanceof KiteApiError`.
+      // `throwOnError: false` above should already keep us off this path; this
+      // is the second line of defence if undici's internals shift again.
+      return new KiteApiError({
+        message: `Kite returned HTTP ${retried.statusCode} for ${method} ${redactString(url.pathname)}.`,
+        status: retried.statusCode,
+        errorType: 'GeneralException',
+        hint: hintForApiError(retried.statusCode, 'GeneralException'),
+      });
+    }
+
     const message = err instanceof Error ? err.message : String(err);
     // undici's fetch wraps the actual failure (ECONNRESET, ENOTFOUND, a TLS
     // error, ...) in `cause` and sets `message` to the unhelpful constant

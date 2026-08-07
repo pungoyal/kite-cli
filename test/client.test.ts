@@ -1,9 +1,9 @@
 import { MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KiteApi } from '../src/core/api.js';
-import { KiteClient, setDispatcher } from '../src/core/client.js';
+import { KiteClient, setDispatcher, withRetryPolicy } from '../src/core/client.js';
 import { ENDPOINTS } from '../src/core/config.js';
-import { ExitCode, KiteApiError } from '../src/core/errors.js';
+import { ExitCode, KiteApiError, NetworkError } from '../src/core/errors.js';
 import { RateLimiter } from '../src/core/ratelimit.js';
 
 /**
@@ -229,6 +229,13 @@ describe('response validation', () => {
 });
 
 describe('retry policy', () => {
+  // A bare MockAgent has no interceptors, so it would exercise no retry
+  // behaviour at all. Compose the SHIPPED policy onto it so these tests assert
+  // what production actually does rather than a restatement of the config.
+  beforeEach(() => {
+    setDispatcher(withRetryPolicy(agent));
+  });
+
   /**
    * The single most important transport test.
    *
@@ -313,6 +320,105 @@ describe('retry policy', () => {
     await new KiteApi(makeClient()).cancelOrder({ variety: 'regular', order_id: '123' }).catch(() => undefined);
 
     expect(attempts).toBe(1);
+  });
+
+  /**
+   * Regression: undici's retry interceptor defaults to `throwOnError: true`,
+   * which swallows every status in our `statusCodes` list and re-emits it as a
+   * RequestRetryError. fetch rewraps that as "TypeError: fetch failed", and we
+   * used to classify it by exclusion as a NetworkError — so a 503 from Kite's
+   * OMS was reported as "Could not reach Kite. Check your network connection."
+   * with the status code discarded. Reported against deleteGtt at 0.9.0.
+   */
+  it('reports a retryable status on a write as a KiteApiError, not a NetworkError', async () => {
+    let attempts = 0;
+    pool()
+      .intercept({ path: '/gtt/triggers/42', method: 'DELETE' })
+      .reply(() => {
+        attempts += 1;
+        return { statusCode: 503, data: { status: 'error', message: 'down', error_type: 'NetworkException' } };
+      })
+      .times(4);
+
+    const error = await new KiteApi(makeClient()).deleteGtt(42).catch((e) => e as Error);
+
+    expect(error).toBeInstanceOf(KiteApiError);
+    expect((error as KiteApiError).status).toBe(503);
+    expect(error.message).not.toContain('Could not reach Kite');
+    // Kite's own envelope, not a status line we synthesised — proof the response
+    // body reached handleResponse rather than being discarded with the error.
+    expect(error.message).toBe('down');
+    expect((error as KiteApiError).errorType).toBe('NetworkException');
+    expect(attempts).toBe(1);
+  });
+
+  it('retries a read through a transient 503 and returns the eventual success', async () => {
+    let attempts = 0;
+    pool()
+      .intercept({ path: '/user/profile', method: 'GET' })
+      .reply<object>(() => {
+        attempts += 1;
+        return attempts <= 2
+          ? { statusCode: 503, data: { status: 'error', message: 'down', error_type: 'NetworkException' } }
+          : { statusCode: 200, data: { status: 'success', data: { user_id: 'AB1234' } } };
+      })
+      .times(3);
+
+    const profile = await new KiteApi(makeClient()).getProfile();
+
+    expect(profile.user_id).toBe('AB1234');
+    expect(attempts).toBe(3);
+  });
+
+  it('surfaces the status once a read exhausts its retries', async () => {
+    let attempts = 0;
+    pool()
+      .intercept({ path: '/user/profile', method: 'GET' })
+      .reply(() => {
+        attempts += 1;
+        return { statusCode: 503, data: { status: 'error', message: 'down', error_type: 'NetworkException' } };
+      })
+      .times(8);
+
+    const error = await new KiteApi(makeClient()).getProfile().catch((e) => e as Error);
+
+    expect(error).toBeInstanceOf(KiteApiError);
+    expect((error as KiteApiError).status).toBe(503);
+    expect(error.message).toBe('down');
+    // The initial attempt plus maxRetries.
+    expect(attempts).toBe(4);
+  }, 15_000);
+
+  it('still maps a non-retryable status on a write to the API’s own message', async () => {
+    let attempts = 0;
+    pool()
+      .intercept({ path: '/gtt/triggers/42', method: 'DELETE' })
+      .reply(() => {
+        attempts += 1;
+        return {
+          statusCode: 400,
+          data: { status: 'error', message: 'Trigger does not exist', error_type: 'InputException' },
+        };
+      })
+      .times(4);
+
+    const error = await new KiteApi(makeClient()).deleteGtt(42).catch((e) => e as Error);
+
+    expect(error).toBeInstanceOf(KiteApiError);
+    expect((error as KiteApiError).status).toBe(400);
+    expect(error.message).toBe('Trigger does not exist');
+    expect(attempts).toBe(1);
+  });
+
+  it('still reports a genuine connection failure as a NetworkError', async () => {
+    pool()
+      .intercept({ path: '/gtt/triggers/42', method: 'DELETE' })
+      .replyWithError(Object.assign(new Error('connect ECONNREFUSED 1.2.3.4:443'), { code: 'ECONNREFUSED' }));
+
+    const error = await new KiteApi(makeClient()).deleteGtt(42).catch((e) => e as Error);
+
+    expect(error).toBeInstanceOf(NetworkError);
+    expect(error.message).toContain('Could not reach Kite');
   });
 });
 
