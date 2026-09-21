@@ -8,6 +8,8 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-21
+
 ### Fixed
 
 - **`kite login` and `kite authorise` open the right page on Windows.** The
@@ -486,7 +488,8 @@ provenance-backed release from CI).
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/pungoyal/kite-cli/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/pungoyal/kite-cli/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/pungoyal/kite-cli/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/pungoyal/kite-cli/compare/v0.8.0...v0.9.0
