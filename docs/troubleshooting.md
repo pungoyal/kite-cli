@@ -40,6 +40,26 @@ subscription at [developers.kite.trade](https://developers.kite.trade).
 session — see above. Historical data is the one endpoint where `403` means
 something else.)
 
+## Orders rejected: "IP … is not allowed" or "No IPs are configured"
+
+Under SEBI's retail-algo rules, Kite accepts requests to its order endpoints only
+from the static IPs registered for your Kite Connect app.
+Register this machine's public IP (up to a primary and a secondary) under
+**IP Whitelist** in your app's profile at
+[developers.kite.trade](https://developers.kite.trade). Reads — holdings,
+quotes, the orderbook, `kite watch` — are not IP-checked, so a CLI that can
+show your portfolio but not trade from a new network is this, not a session
+problem.
+
+## "Market orders without market protection are not allowed"
+
+Kite rejects MARKET and SL-M orders sent over the API without a
+`market_protection` value. The CLI sends `-1` (Kite's automatic band) on
+every MARKET and SL-M order, modify, and alert basket leg unless you pass
+`--market-protection <pct>`; library callers of `KiteApi.placeOrder` and
+`modifyOrder` get the same default. If you still see this error, you are on
+a release older than the one that added it — upgrade.
+
 ## An order placement timed out — did it execute?
 
 Read the CLI's own output first — it already checked for you:

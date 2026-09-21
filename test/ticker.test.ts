@@ -19,6 +19,8 @@ const NSE_TOKEN = 408065; // 408065 & 0xff === 1
 const NSE_CD_TOKEN = 0x010003;
 /** BSE currency token: low byte 6 → divisor 10,000. */
 const BSE_CD_TOKEN = 0x010006;
+/** NSE commodity (NCO) token: low byte 12 → divisor 10,000. */
+const NCO_TOKEN = 0x01000c;
 /** Index token: low byte 9 → non-tradeable. */
 const INDEX_TOKEN = 256265; // 256265 & 0xff === 9
 
@@ -28,6 +30,8 @@ describe('segment decoding', () => {
     expect(divisorFor(NSE_CD_TOKEN)).toBe(10_000_000);
     // BSE currency divides by 10,000 — a case the official docs omit entirely.
     expect(divisorFor(BSE_CD_TOKEN)).toBe(10_000);
+    // So does NSE commodity; the official SDKs added it in 2026.
+    expect(divisorFor(NCO_TOKEN)).toBe(10_000);
   });
 
   it('identifies indices as non-tradeable', () => {

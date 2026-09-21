@@ -47,6 +47,27 @@ export const PRODUCTS: Product[] = ['CNC', 'NRML', 'MIS', 'MTF'];
 export const VALIDITIES: Validity[] = ['DAY', 'IOC', 'TTL'];
 export const EXCHANGES: Exchange[] = ['NSE', 'BSE', 'NFO', 'CDS', 'BCD', 'MCX', 'BFO'];
 
+/**
+ * Kite rejects any MARKET or SL-M order placed or modified over the API without
+ * `market_protection` (a SEBI retail-algo rule Zerodha now enforces):
+ * "Market orders without market protection are not allowed via API". `-1`
+ * asks Kite to apply its own automatic protection band — the value Kite's docs
+ * and every official SDK example use, and what `gtt` already sends.
+ */
+export const AUTO_MARKET_PROTECTION = -1;
+
+export function needsMarketProtection(orderType: OrderType | undefined): boolean {
+  return orderType === 'MARKET' || orderType === 'SL-M';
+}
+
+/** Fill in automatic market protection when the caller left it unset. */
+function withMarketProtection<T extends { order_type?: OrderType | undefined; market_protection?: number | undefined }>(
+  params: T,
+): T {
+  if (params.market_protection !== undefined || !needsMarketProtection(params.order_type)) return params;
+  return { ...params, market_protection: AUTO_MARKET_PROTECTION };
+}
+
 export interface PlaceOrderParams {
   variety: Variety;
   tradingsymbol: string;
@@ -63,13 +84,18 @@ export interface PlaceOrderParams {
   iceberg_legs?: number | undefined;
   iceberg_quantity?: number | undefined;
   auction_number?: string | undefined;
+  /**
+   * Percentage band (>0 and <=100) or -1 for Kite's automatic protection.
+   * Required by Kite for MARKET and SL-M; `placeOrder` defaults it to -1 for
+   * those order types when left unset.
+   */
   market_protection?: number | undefined;
   /**
    * Auto-split into multiple orders (max 10 slices) when quantity exceeds the
-   * exchange's freeze limit. Kite defaults this to false. The response shape
-   * is the same array-of-order-or-error either way a slice can fail
-   * independently, so `placeOrder`'s caller already handles it — see
-   * `placeOrder` in commands/orders.ts.
+   * exchange's freeze limit. Kite defaults this to false. The response carries
+   * a parent `order_id` plus a `children` list where each slice is either an
+   * order or an error — slices fail independently, so see `placeOrder` in
+   * commands/orders.ts for how the CLI handles a partial failure.
    */
   autoslice?: boolean | undefined;
   /**
@@ -89,6 +115,8 @@ export interface ModifyOrderParams {
   order_type?: OrderType | undefined;
   disclosed_quantity?: number | undefined;
   validity?: Validity | undefined;
+  /** As on `PlaceOrderParams`; defaulted to -1 when modifying to MARKET or SL-M. */
+  market_protection?: number | undefined;
 }
 
 export class KiteApi {
@@ -192,7 +220,7 @@ export class KiteApi {
    * a timed-out request may still have been executed.
    */
   async placeOrder(params: PlaceOrderParams, signal?: AbortSignal) {
-    const { variety, ...rest } = params;
+    const { variety, ...rest } = withMarketProtection(params);
     return this.client.request({
       method: 'POST',
       path: `/orders/${variety}`,
@@ -204,7 +232,7 @@ export class KiteApi {
   }
 
   async modifyOrder(params: ModifyOrderParams, signal?: AbortSignal) {
-    const { variety, order_id, ...rest } = params;
+    const { variety, order_id, ...rest } = withMarketProtection(params);
     return this.client.request({
       method: 'PUT',
       path: `/orders/${variety}/${encodeURIComponent(order_id)}`,
@@ -724,8 +752,8 @@ export interface AlertParams {
   basket?: AlertBasket | undefined;
   /**
    * Optimistic only: Kite's documented modify parameters do not include
-   * `status`, and neither official SDK implements the alerts API at all. Sent
-   * anyway since undocumented behaviour can lag the docs, but the caller must
+   * `status`, and gokiteconnect's `ModifyAlert` (the one official SDK that
+   * implements alerts) does not send it either. Sent anyway since undocumented behaviour can lag the docs, but the caller must
    * verify the response's own `status` rather than trust this was honoured.
    */
   status?: 'enabled' | 'disabled' | undefined;

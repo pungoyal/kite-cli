@@ -7,6 +7,8 @@ import {
   type AlertOperator,
   type AlertParams,
   type AlertType,
+  AUTO_MARKET_PROTECTION,
+  needsMarketProtection,
   ORDER_TYPES,
   type OrderType,
   PRODUCTS,
@@ -712,6 +714,9 @@ async function buildAtoBasket(
         price: leg.price ?? 0,
         trigger_price: leg.triggerPrice ?? 0,
         variety: 'regular',
+        // Kite's ATO example sends this on MARKET legs; the order the alert
+        // fires is an API order, which Kite rejects as MARKET/SL-M without it.
+        ...(needsMarketProtection(leg.orderType) ? { market_protection: AUTO_MARKET_PROTECTION } : {}),
       },
     });
 
@@ -857,8 +862,8 @@ async function disableAlert(ctx: Context, _opts: unknown, command: { args: strin
 /**
  * Kite's alerts API documents no `status` parameter on modify and no
  * dedicated enable/disable endpoint — `status` only ever appears as a
- * response field (neither official SDK implements the alerts API at all, so
- * there's no reference implementation to check either). We send it as an
+ * response field (gokiteconnect, the one official SDK with alerts support,
+ * never sends it on modify either). We send it as an
  * optimistic field on the PUT anyway, since real behaviour can lag docs, but
  * never just trust the request "succeeded": a fresh GET after the PUT is
  * checked, and a mismatch fails loudly rather than reporting an alert as

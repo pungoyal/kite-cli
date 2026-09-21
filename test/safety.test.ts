@@ -349,6 +349,215 @@ describe('--autoslice', () => {
   });
 });
 
+describe('market protection', () => {
+  /** Quote + charges stubs every `orders place` makes before it confirms. */
+  function stubPreview() {
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    pool.intercept({ path: '/charges/orders', method: 'POST' }).reply(200, {
+      status: 'success',
+      data: [{ tradingsymbol: 'INFY', exchange: 'NSE', charges: { total: 12.5 } }],
+    });
+    return pool;
+  }
+
+  function captureOrderForm(pool: ReturnType<typeof stubPreview>, path = '/orders/regular', method = 'POST') {
+    const captured: { form?: URLSearchParams } = {};
+    pool.intercept({ path, method }).reply((opts) => {
+      captured.form = new URLSearchParams(String(opts.body));
+      return { statusCode: 200, data: { status: 'success', data: { order_id: '1' } } };
+    });
+    return captured;
+  }
+
+  it('sends automatic protection (-1) on a default MARKET order and shows it in the preview', async () => {
+    await seedSession();
+    const captured = captureOrderForm(stubPreview());
+
+    const code = await invoke(['orders', 'place', 'NSE:INFY', '-s', 'BUY', '-q', '1', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.form?.get('order_type')).toBe('MARKET');
+    expect(captured.form?.get('market_protection')).toBe('-1');
+    expect(err).toMatch(/Mkt protection\s+automatic/);
+  });
+
+  it('sends a custom percentage for an SL-M order', async () => {
+    await seedSession();
+    const captured = captureOrderForm(stubPreview());
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'SELL',
+      '-q',
+      '1',
+      '-t',
+      'SL-M',
+      '--trigger-price',
+      '1450',
+      '--market-protection',
+      '2.5',
+      '--yes',
+    ]);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.form?.get('market_protection')).toBe('2.5');
+  });
+
+  it('sends none on a LIMIT order', async () => {
+    await seedSession();
+    const captured = captureOrderForm(stubPreview());
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '-t',
+      'LIMIT',
+      '-p',
+      '1500',
+      '--yes',
+    ]);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.form?.has('market_protection')).toBe(false);
+  });
+
+  it.each([
+    ['0', /-1 \(automatic\) or a percentage/],
+    ['101', /-1 \(automatic\) or a percentage/],
+  ])('rejects --market-protection %s', async (value, message) => {
+    await seedSession();
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '--market-protection',
+      value,
+      '--yes',
+    ]);
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).toMatch(message);
+  });
+
+  it('rejects --market-protection on a LIMIT order', async () => {
+    await seedSession();
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '1',
+      '-t',
+      'LIMIT',
+      '-p',
+      '1500',
+      '--market-protection',
+      '5',
+      '--yes',
+    ]);
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).toMatch(/only applies to MARKET and SL-M/);
+  });
+
+  it('sends automatic protection when a modify switches the order to MARKET', async () => {
+    await seedSession();
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: '/orders', method: 'GET' }).reply(200, {
+      status: 'success',
+      data: [
+        {
+          order_id: '123',
+          status: 'OPEN',
+          variety: 'regular',
+          tradingsymbol: 'INFY',
+          exchange: 'NSE',
+          quantity: 10,
+          price: 1500,
+          order_type: 'LIMIT',
+        },
+      ],
+    });
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    const captured = captureOrderForm(pool, '/orders/regular/123', 'PUT');
+
+    const code = await invoke(['orders', 'modify', '123', '-t', 'MARKET', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.form?.get('order_type')).toBe('MARKET');
+    expect(captured.form?.get('market_protection')).toBe('-1');
+  });
+});
+
+describe('autoslice response with a parent order and children', () => {
+  it('reports each child, the parent, and exits non-zero when a slice fails', async () => {
+    await seedSession();
+    const pool = agent.get('https://api.kite.trade');
+    pool.intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' }).reply(200, {
+      status: 'success',
+      data: { 'NSE:INFY': { instrument_token: 408065, last_price: 1500 } },
+    });
+    pool.intercept({ path: '/charges/orders', method: 'POST' }).reply(200, {
+      status: 'success',
+      data: [{ tradingsymbol: 'INFY', exchange: 'NSE', charges: { total: 12.5 } }],
+    });
+    // The shape Kite has returned since March 2026 (kiteconnect-mocks c7a81238).
+    pool.intercept({ path: '/orders/regular', method: 'POST' }).reply(200, {
+      status: 'success',
+      data: {
+        order_id: '900',
+        children: [
+          { order_id: '901' },
+          { error: { code: 400, error_type: 'MarginException', message: 'Insufficient funds' } },
+          { order_id: '903' },
+        ],
+      },
+    });
+
+    const code = await invoke([
+      'orders',
+      'place',
+      'NSE:INFY',
+      '-s',
+      'BUY',
+      '-q',
+      '3600',
+      '-t',
+      'LIMIT',
+      '-p',
+      '1500',
+      '--autoslice',
+      '--yes',
+      '--json',
+    ]);
+
+    expect(code).toBe(ExitCode.Order);
+    const parsed = JSON.parse(out);
+    expect(parsed.order_ids).toEqual(['901', '903']);
+    expect(parsed.parent_order_id).toBe('900');
+    expect(parsed.errors).toEqual(['Insufficient funds']);
+  });
+});
+
 describe('pre-trade charges preview', () => {
   it('shows the estimated charges alongside the estimated value', async () => {
     await seedSession();

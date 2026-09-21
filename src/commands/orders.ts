@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { Context } from '../context.js';
 import {
+  AUTO_MARKET_PROTECTION,
+  needsMarketProtection,
   ORDER_TYPES,
   type OrderType,
   type PlaceOrderParams,
@@ -92,6 +94,10 @@ export const orderCommands: CommandFactory = (program, run) => {
     .option('--disclosed-quantity <n>', 'Disclosed quantity')
     .option('--iceberg-legs <n>', 'Number of iceberg legs (2-50)')
     .option('--iceberg-quantity <n>', 'Quantity per iceberg leg')
+    .option(
+      '--market-protection <pct>',
+      "Market protection for MARKET/SL-M: a % band (>0 to 100), or -1 for Kite's automatic band (the default)",
+    )
     .option('--autoslice', 'Auto-split into up to 10 orders if quantity exceeds the exchange freeze limit')
     .option('--tag <tag>', 'Custom tag, max 20 alphanumeric characters')
     .addHelpText(
@@ -99,6 +105,7 @@ export const orderCommands: CommandFactory = (program, run) => {
       examples([
         ['kite orders place NSE:INFY -s BUY -q 1 --dry-run', 'Preview the resolved order, send nothing'],
         ['kite orders place NSE:INFY -s BUY -q 10', 'Market buy, delivery (CNC is the default)'],
+        ['kite orders place NSE:INFY -s BUY -q 10 --market-protection 2', 'Market buy, filling at most 2% away'],
         ['kite orders place NSE:INFY -s SELL -q 10 -t LIMIT -p 1650', 'Limit sell at ₹1,650'],
         [
           'kite orders place NSE:INFY -s SELL -q 10 -t SL -p 1595 --trigger-price 1600',
@@ -132,6 +139,10 @@ export const orderCommands: CommandFactory = (program, run) => {
     .option('--trigger-price <price>', 'New trigger price')
     .option('-t, --type <type>', `New order type (${ORDER_TYPES.join(', ')})`)
     .option('--validity <validity>', `New validity (${VALIDITIES.join(', ')})`)
+    .option(
+      '--market-protection <pct>',
+      "Market protection for MARKET/SL-M: a % band (>0 to 100), or -1 for Kite's automatic band (the default)",
+    )
     .option('--variety <variety>', 'Order variety (inferred from the orderbook if omitted)')
     .addHelpText(
       'after',
@@ -334,6 +345,16 @@ function tradeColumns(): Array<Column<Trade>> {
  * registered. Re-validating here turns that silent type lie into a runtime
  * guarantee — worth it on the one command that spends money.
  */
+const MARKET_PROTECTION_MESSAGE = '--market-protection must be -1 (automatic) or a percentage above 0, up to 100.';
+
+function isValidMarketProtection(value: number): boolean {
+  return value === AUTO_MARKET_PROTECTION || (value > 0 && value <= 100);
+}
+
+function describeMarketProtection(value: number): string {
+  return value === AUTO_MARKET_PROTECTION ? "automatic (Kite's band)" : `${value}%`;
+}
+
 const PlaceOptionsSchema = z.object({
   side: z.string(),
   quantity: z.coerce.number().int().positive(),
@@ -347,6 +368,7 @@ const PlaceOptionsSchema = z.object({
   disclosedQuantity: z.coerce.number().int().nonnegative().optional(),
   icebergLegs: z.coerce.number().int().min(2).max(50).optional(),
   icebergQuantity: z.coerce.number().int().positive().optional(),
+  marketProtection: z.coerce.number().refine(isValidMarketProtection, MARKET_PROTECTION_MESSAGE).optional(),
   autoslice: z.boolean().optional(),
   tag: z
     .string()
@@ -388,6 +410,14 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
   if (orderType === 'MARKET' && opts.price !== undefined) {
     throw new UsageError('--price cannot be used with a MARKET order.');
   }
+  if (opts.marketProtection !== undefined && !needsMarketProtection(orderType)) {
+    throw new UsageError('--market-protection only applies to MARKET and SL-M orders.');
+  }
+  // Kite rejects MARKET and SL-M orders without it; resolved here rather than
+  // left to the api layer's default so the preview shows what is really sent.
+  const marketProtection = needsMarketProtection(orderType)
+    ? (opts.marketProtection ?? AUTO_MARKET_PROTECTION)
+    : undefined;
   if (validity === 'TTL' && opts.validityTtl === undefined) {
     throw new UsageError('--validity-ttl is required when validity is TTL.');
   }
@@ -496,6 +526,9 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
       { label: 'Order type', value: orderType },
       ...(opts.price !== undefined ? [{ label: 'Price', value: rupees(opts.price) }] : []),
       ...(opts.triggerPrice !== undefined ? [{ label: 'Trigger', value: rupees(opts.triggerPrice) }] : []),
+      ...(marketProtection !== undefined
+        ? [{ label: 'Mkt protection', value: describeMarketProtection(marketProtection) }]
+        : []),
       { label: 'Product', value: product },
       { label: 'Variety', value: variety },
       { label: 'Validity', value: validity },
@@ -540,6 +573,7 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
     validity_ttl: opts.validityTtl,
     iceberg_legs: opts.icebergLegs,
     iceberg_quantity: opts.icebergQuantity,
+    market_protection: marketProtection,
     autoslice: opts.autoslice,
     tag,
   };
@@ -565,11 +599,21 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
     throw err;
   }
 
-  // With autoslice the response is an array with mixed successes and errors.
+  // With autoslice the response mixes successes and errors: a parent order_id
+  // with a `children` list, or (the shape Kite's docs still describe) a bare
+  // array. Only the slices are orders a user can look up.
   const orderIds: string[] = [];
   const errors: string[] = [];
-  if (Array.isArray(result)) {
-    for (const entry of result) {
+  let parentOrderId: string | undefined;
+  const children = Array.isArray(result) ? undefined : (result as { children?: unknown }).children;
+  const slices: unknown[] | undefined = Array.isArray(result)
+    ? result
+    : Array.isArray(children) && children.length > 0
+      ? children
+      : undefined;
+  if (!Array.isArray(result) && slices) parentOrderId = result.order_id;
+  if (slices) {
+    for (const entry of slices) {
       // Loose schemas widen these to `unknown`, and a sliced response mixes
       // successes with errors, so check the shape rather than trusting it.
       const orderId = (entry as { order_id?: unknown }).order_id;
@@ -580,7 +624,7 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
         errors.push(typeof message === 'string' ? message : 'Unknown slice error');
       }
     }
-  } else {
+  } else if (!Array.isArray(result)) {
     orderIds.push(result.order_id);
   }
 
@@ -589,9 +633,16 @@ async function placeOrder(ctx: Context, rawOpts: unknown, command: { args: strin
   if (errors.length > 0) process.exitCode = ExitCode.Order;
 
   if (ctx.io.json) {
-    ctx.io.writeJson({ order_ids: orderIds, errors, tag });
+    ctx.io.writeJson({
+      order_ids: orderIds,
+      errors,
+      tag,
+      ...(parentOrderId ? { parent_order_id: parentOrderId } : {}),
+    });
     return;
   }
+
+  if (parentOrderId) ctx.io.info(`Autosliced into ${slices?.length ?? 0} orders (parent ${parentOrderId}).`);
 
   for (const orderId of orderIds) {
     ctx.io.success(`Order placed: ${ctx.io.bold(orderId)}`);
@@ -759,6 +810,7 @@ async function modifyOrder(
     triggerPrice?: string;
     type?: string;
     validity?: string;
+    marketProtection?: string;
     variety?: string;
   },
   command: { args: string[] },
@@ -815,9 +867,27 @@ async function modifyOrder(
     });
   }
 
+  if (opts.marketProtection !== undefined) {
+    const value = Number(opts.marketProtection);
+    if (!Number.isFinite(value) || !isValidMarketProtection(value)) throw new UsageError(MARKET_PROTECTION_MESSAGE);
+    // Kite ignores or rejects protection on a LIMIT/SL order. An order whose
+    // type is unknown gets the benefit of the doubt; Kite is the final judge.
+    const effectiveType = params.order_type ?? (existing?.order_type as OrderType | undefined);
+    if (effectiveType !== undefined && !needsMarketProtection(effectiveType)) {
+      throw new UsageError('--market-protection only applies to MARKET and SL-M orders.');
+    }
+    params.market_protection = value;
+  } else if (needsMarketProtection(params.order_type)) {
+    // Kite rejects a switch to MARKET/SL-M without it.
+    params.market_protection = AUTO_MARKET_PROTECTION;
+  }
+  if (params.market_protection !== undefined) {
+    changes.push({ label: 'Mkt protection', value: describeMarketProtection(params.market_protection) });
+  }
+
   if (changes.length === 0) {
     throw new UsageError(
-      'Nothing to modify. Pass at least one of --quantity, --price, --trigger-price, --type or --validity.',
+      'Nothing to modify. Pass at least one of --quantity, --price, --trigger-price, --type, --validity or --market-protection.',
     );
   }
 

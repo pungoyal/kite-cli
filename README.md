@@ -254,6 +254,8 @@ terminal, by design.
 - **Sessions expire at 6:00 AM IST daily**, and logging into Kite *web* invalidates your API session — detectable only as a later 403.
 - **Order acceptance is not execution.** A returned order ID means the OMS accepted the request; check `kite orders get <id>` for what actually happened.
 - **Rate limits are tight**: quotes 1/sec, historical 3/sec, orders 10/sec (plus 400/min and 5,000/day). The CLI paces requests and batches quotes for you.
+- **Orders only go out from a registered static IP.** Kite checks order endpoints against the IPs whitelisted for your app at developers.kite.trade; reads and streaming are not checked.
+- **MARKET and SL-M orders need market protection.** Kite rejects them over the API without it; the CLI sends Kite's automatic band (`-1`) unless you pass `--market-protection <pct>`.
 - **Historical data is a paid add-on** — a 403 there is a permission problem, not an expired session.
 - **Mutual funds are read-only** over the API, and `mf orders` only reaches back 7 days (`mf orders get <id>` doesn't).
 

@@ -132,10 +132,16 @@ const order = await api.placeOrder({
 `PlaceOrderParams.autoslice` (boolean, default `false`) auto-splits an order
 into up to 10 child orders when its quantity exceeds the exchange's freeze
 limit, instead of a single rejection. When it does, `placeOrder` resolves to
-an array — one entry per slice, each either `{ order_id }` or
-`{ error: { code, error_type, message } }` — rather than the single-order
-shape; see `commands/orders.ts` for how the CLI's own `orders place
---autoslice` handles the mixed success/error array.
+`{ order_id, children }` — a parent id plus one entry per slice, each either
+`{ order_id }` or `{ error: { code, error_type, message } }` — so slices can
+succeed and fail independently. The older bare-array shape that Kite's docs
+still describe is accepted too; see `commands/orders.ts` for how the CLI's own
+`orders place --autoslice` handles both.
+
+`placeOrder` and `modifyOrder` set `market_protection: -1` (Kite's automatic
+band) on MARKET and SL-M orders when you leave it unset, because Kite rejects
+those orders over the API without it. Pass your own value (a percentage above
+0, up to 100) to override it.
 
 `core/api.ts` also has internal helpers (`parseInterval`, `splitDateRange`,
 `chunks`, `formatIstDateTime`) that the CLI's own commands use for interval

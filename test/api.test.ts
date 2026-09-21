@@ -382,3 +382,55 @@ describe('authorisationUrl', () => {
     expect(url).toContain('/portfolio/authorise/holdings/testkey/req%2F123');
   });
 });
+
+describe('market protection on the library API', () => {
+  function captureForm(path: string, method: 'POST' | 'PUT') {
+    const captured: { form?: URLSearchParams } = {};
+    pool()
+      .intercept({ path, method })
+      .reply((opts) => {
+        captured.form = new URLSearchParams(String(opts.body));
+        return { statusCode: 200, data: { status: 'success', data: { order_id: '1' } } };
+      });
+    return captured;
+  }
+
+  const base = {
+    variety: 'regular',
+    exchange: 'NSE',
+    tradingsymbol: 'INFY',
+    transaction_type: 'BUY',
+    quantity: 1,
+    product: 'CNC',
+  } as const;
+
+  it('defaults MARKET and SL-M orders to automatic protection, which Kite otherwise rejects', async () => {
+    const market = captureForm('/orders/regular', 'POST');
+    await api().placeOrder({ ...base, order_type: 'MARKET' });
+    expect(market.form?.get('market_protection')).toBe('-1');
+
+    const slm = captureForm('/orders/regular', 'POST');
+    await api().placeOrder({ ...base, order_type: 'SL-M', trigger_price: 1400 });
+    expect(slm.form?.get('market_protection')).toBe('-1');
+  });
+
+  it("keeps a caller's own value and adds nothing to a LIMIT order", async () => {
+    const custom = captureForm('/orders/regular', 'POST');
+    await api().placeOrder({ ...base, order_type: 'MARKET', market_protection: 3 });
+    expect(custom.form?.get('market_protection')).toBe('3');
+
+    const limit = captureForm('/orders/regular', 'POST');
+    await api().placeOrder({ ...base, order_type: 'LIMIT', price: 1500 });
+    expect(limit.form?.has('market_protection')).toBe(false);
+  });
+
+  it('adds it when a modify switches to MARKET, and not on a price-only modify', async () => {
+    const toMarket = captureForm('/orders/regular/42', 'PUT');
+    await api().modifyOrder({ variety: 'regular', order_id: '42', order_type: 'MARKET' });
+    expect(toMarket.form?.get('market_protection')).toBe('-1');
+
+    const priceOnly = captureForm('/orders/regular/42', 'PUT');
+    await api().modifyOrder({ variety: 'regular', order_id: '42', price: 1510 });
+    expect(priceOnly.form?.has('market_protection')).toBe(false);
+  });
+});

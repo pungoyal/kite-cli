@@ -8,6 +8,49 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **MARKET and SL-M orders are no longer rejected for missing market
+  protection.** Kite now refuses API market orders sent without
+  `market_protection` ("Market orders without market protection are not
+  allowed via API"), which broke the CLI's default `kite orders place` (a MARKET
+  order) and every SL-M order. `orders place`, `orders modify` (when switching
+  to MARKET or SL-M) and ATO alert basket legs now send `-1`, Kite's automatic
+  protection band, and the confirmation preview shows it. The new
+  `--market-protection <pct>` flag on `orders place` and `orders modify` sets
+  your own band (above 0, up to 100). Library callers of `KiteApi.placeOrder`
+  and `modifyOrder` get the same `-1` default unless they pass a value.
+- **Autoslice results are read from Kite's current response shape.** Kite
+  changed autosliced placements to return a parent `order_id` with a `children`
+  list, where each child is an order or that slice's error. The CLI read only
+  the parent, so it dropped the slice order ids, never reported failed slices,
+  and exited `0` on a partial failure. It now lists every slice, reports each
+  failure, exits `5` when any slice fails, and adds `parent_order_id` to the
+  `--json` output. The older bare-array shape is still accepted.
+- **`kite watch` prices NSE commodity (NCO) instruments correctly.** Their
+  ticker prices are scaled by 10,000, not 100, so they showed 100 times too
+  high. This matches the fix Zerodha shipped in its official SDKs.
+
+### Added
+
+- **A hint for Kite's static-IP rejection.** Kite now accepts requests to its
+  order endpoints only from the static IPs whitelisted for your app. "IP … is
+  not allowed" and "No IPs are configured" errors now point to the IP Whitelist
+  at developers.kite.trade rather than at app permissions. The troubleshooting
+  guide covers this rule and the market-protection rule.
+
+### Changed
+
+- **Dependencies:** `@napi-rs/keyring` 2.1 (it now throws on real keychain
+  failures instead of reporting "no credential"; the CLI still falls back to
+  the encrypted file, and `kite doctor` now reports a locked or denied keychain
+  as unavailable), plus in-range updates to `@clack/prompts`, `undici`, `ws`
+  and `zod`.
+- **Project upkeep:** CodeQL and OpenSSF Scorecard workflows, Dependabot
+  coverage for the docs site, `persist-credentials: false` on every CI
+  checkout, cancellation of superseded PR runs, and job timeouts. Dev tooling
+  moves to Vitest 5.
+
 ## [0.9.1] - 2026-08-07
 
 ### Fixed

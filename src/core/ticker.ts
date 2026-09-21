@@ -65,8 +65,9 @@ export interface Tick {
  * the price divisor.
  *
  * Kite's docs mention only the currency case ("divide by 10000000"), and omit
- * BSE currency entirely — that one divides by 10000. Getting this wrong yields
- * prices that are wrong by three orders of magnitude, silently.
+ * BSE currency and NSE commodity (NCO) entirely — both divide by 10000, per the
+ * official SDKs. Getting this wrong yields prices that are wrong by orders of
+ * magnitude, silently.
  */
 const Segment = {
   NseCM: 1,
@@ -78,12 +79,13 @@ const Segment = {
   McxFO: 7,
   McxSX: 8,
   Indices: 9,
+  Nco: 12,
 } as const;
 
 export function divisorFor(instrumentToken: number): number {
   const segment = instrumentToken & 0xff;
   if (segment === Segment.NseCD) return 10_000_000;
-  if (segment === Segment.BseCD) return 10_000;
+  if (segment === Segment.BseCD || segment === Segment.Nco) return 10_000;
   return 100;
 }
 

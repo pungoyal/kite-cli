@@ -58,6 +58,8 @@ commands, so the exported library gets identical behaviour.
 - Sessions die at 06:00 IST daily; a Kite-web login also invalidates the API token (only detectable as a later 403).
 - Order acceptance ≠ execution. Check `orders get <id>`.
 - Rate limits are tight: quotes 1/sec, historical 3/sec, orders 10/sec + 400/min + 5000/day.
+- MARKET and SL-M orders (place, modify, alert basket legs) must carry `market_protection` or Kite rejects them; `api.ts` defaults it to `-1`.
+- Order endpoints accept requests only from the app's whitelisted static IPs.
 - Historical data is a **paid add-on** — a 403 there is a permission problem, not an expired session.
 - The ticker dispatches on packet **byte length**, not the subscribed mode; index vs tradeable layouts differ, and OHLC field order differs between them.
 

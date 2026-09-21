@@ -92,6 +92,32 @@ describe('error mapping', () => {
     expect(error.hint).toMatch(/kite login/);
   });
 
+  it.each(['IP 203.0.113.7 is not allowed to place orders for this app.', 'No IPs are configured for this app'])(
+    'points a static-IP rejection at the IP whitelist, not at permissions: %s',
+    async (message) => {
+      pool().intercept({ path: '/orders/regular', method: 'POST' }).reply(403, {
+        status: 'error',
+        message,
+        error_type: 'PermissionException',
+      });
+
+      const error = await new KiteApi(makeClient())
+        .placeOrder({
+          variety: 'regular',
+          exchange: 'NSE',
+          tradingsymbol: 'INFY',
+          transaction_type: 'BUY',
+          order_type: 'LIMIT',
+          price: 1500,
+          quantity: 1,
+          product: 'CNC',
+        })
+        .catch((e) => e);
+      expect(error).toBeInstanceOf(KiteApiError);
+      expect(error.hint).toMatch(/IP Whitelist/);
+    },
+  );
+
   it('maps MarginException to the margin exit code', async () => {
     pool().intercept({ path: '/orders/regular', method: 'POST' }).reply(400, {
       status: 'error',

@@ -152,9 +152,16 @@ function exitCodeForApiError(status: number, errorType: string): ExitCodeValue {
  * Remediation hints for the error types where the right next step is not
  * obvious from Kite's own message.
  */
-export function hintForApiError(status: number, errorType: string): string | undefined {
+export function hintForApiError(status: number, errorType: string, message = ''): string | undefined {
   if (errorType === 'TokenException') {
     return 'Your session expired or was invalidated (logging into Kite web ends API sessions). Run `kite login`.';
+  }
+  // SEBI's retail-algo rules: Kite validates order endpoints (only) against
+  // the app's registered static IPs. Kite's messages are "IP <ip> is not
+  // allowed to place orders for this app" and "No IPs are configured for this
+  // app". Checked before the generic 403 hint, which would blame permissions.
+  if (/\bIPs?\b.*\b(not allowed|configured)\b/i.test(message)) {
+    return "Kite only accepts orders from the static IPs registered for your app. Add this machine's public IP under IP Whitelist on developers.kite.trade (reads and the ticker are not affected).";
   }
   // A 403 that is NOT a TokenException is a permission problem, not an expired
   // session — most often an endpoint this app is not subscribed to (the

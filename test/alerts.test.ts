@@ -180,13 +180,15 @@ describe('alerts create --order (through run)', () => {
     expect(basket.items[0]).toMatchObject({
       exchange: 'NFO',
       tradingsymbol: 'INDIGO25AUGFUT',
-      params: { transaction_type: 'BUY', order_type: 'MARKET', product: 'NRML', quantity: 150 },
+      params: { transaction_type: 'BUY', order_type: 'MARKET', product: 'NRML', quantity: 150, market_protection: -1 },
     });
     expect(basket.items[1]).toMatchObject({
       exchange: 'NSE',
       tradingsymbol: 'RELIANCE',
       params: { transaction_type: 'SELL', order_type: 'LIMIT', price: 2900, quantity: 10 },
     });
+    // Kite rejects API MARKET orders without protection; LIMIT legs carry none.
+    expect(basket.items[1].params).not.toHaveProperty('market_protection');
   });
 
   it('fails closed when a single leg cannot be priced and a cap is set', async () => {

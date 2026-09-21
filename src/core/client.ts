@@ -340,7 +340,7 @@ export class KiteClient {
         message: redactString(message),
         status: response.status,
         errorType,
-        hint: hintForApiError(response.status, errorType),
+        hint: hintForApiError(response.status, errorType, message),
       });
     }
 
@@ -360,7 +360,7 @@ export class KiteClient {
         message: redactString(envelope.data.message ?? 'Unknown error'),
         status: response.status,
         errorType,
-        hint: hintForApiError(response.status, errorType),
+        hint: hintForApiError(response.status, errorType, envelope.data.message),
       });
     }
 

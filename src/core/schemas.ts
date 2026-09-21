@@ -174,27 +174,31 @@ export const TradeSchema = z.looseObject({
 });
 export type Trade = z.infer<typeof TradeSchema>;
 
+/** One autoslice child: a placed order, or that slice's own error. */
+const SliceResultSchema = z.union([
+  z.looseObject({ order_id: z.string() }),
+  z.looseObject({
+    error: z.looseObject({
+      code: z.number().optional(),
+      error_type: z.string().optional(),
+      message: z.string().optional(),
+    }),
+  }),
+]);
+
 /**
  * Place-order response.
  *
- * With `autoslice=true` the shape changes from an object to an ARRAY of up to
- * 10 entries, where success and failure can coexist in a single response. This
- * union models that; callers must handle both.
+ * With `autoslice=true` the response is a parent `order_id` plus a `children`
+ * list of up to 10 slices, where successes and failures coexist in a single
+ * response. Kite's docs still describe the pre-March-2026 shape (a bare array
+ * of slices), so that is accepted too. The `children` branch must come first:
+ * the plain `{ order_id }` branch is loose and would otherwise swallow it.
  */
 export const PlaceOrderResultSchema = z.union([
+  z.looseObject({ order_id: z.string(), children: z.array(SliceResultSchema) }),
   z.looseObject({ order_id: z.string() }),
-  z.array(
-    z.union([
-      z.looseObject({ order_id: z.string() }),
-      z.looseObject({
-        error: z.looseObject({
-          code: z.number().optional(),
-          error_type: z.string().optional(),
-          message: z.string().optional(),
-        }),
-      }),
-    ]),
-  ),
+  z.array(SliceResultSchema),
 ]);
 export type PlaceOrderResult = z.infer<typeof PlaceOrderResultSchema>;
 

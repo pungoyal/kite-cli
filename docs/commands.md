@@ -772,33 +772,37 @@ Usage: kite orders place [options] <instrument>
 Place an order
 
 Arguments:
-  instrument                Instrument as EXCHANGE:SYMBOL, e.g. NSE:INFY
+  instrument                 Instrument as EXCHANGE:SYMBOL, e.g. NSE:INFY
 
 Options:
-  -s, --side <side>         BUY or SELL
-  -q, --quantity <n>        Quantity
-  -t, --type <type>         Order type (MARKET, LIMIT, SL, SL-M) (default:
-                            "MARKET")
-  -p, --price <price>       Limit price (required for LIMIT and SL)
-  --trigger-price <price>   Trigger price (required for SL and SL-M)
-  --product <product>       Product (CNC, NRML, MIS, MTF) (default: "CNC")
-  --variety <variety>       Variety (regular, amo, co, iceberg, auction)
-                            (default: "regular")
-  --validity <validity>     Validity (DAY, IOC, TTL) (default: "DAY")
-  --validity-ttl <minutes>  Minutes to live, for TTL validity
-  --disclosed-quantity <n>  Disclosed quantity
-  --iceberg-legs <n>        Number of iceberg legs (2-50)
-  --iceberg-quantity <n>    Quantity per iceberg leg
-  --autoslice               Auto-split into up to 10 orders if quantity exceeds
-                            the exchange freeze limit
-  --tag <tag>               Custom tag, max 20 alphanumeric characters
-  -h, --help                display help for command
+  -s, --side <side>          BUY or SELL
+  -q, --quantity <n>         Quantity
+  -t, --type <type>          Order type (MARKET, LIMIT, SL, SL-M) (default:
+                             "MARKET")
+  -p, --price <price>        Limit price (required for LIMIT and SL)
+  --trigger-price <price>    Trigger price (required for SL and SL-M)
+  --product <product>        Product (CNC, NRML, MIS, MTF) (default: "CNC")
+  --variety <variety>        Variety (regular, amo, co, iceberg, auction)
+                             (default: "regular")
+  --validity <validity>      Validity (DAY, IOC, TTL) (default: "DAY")
+  --validity-ttl <minutes>   Minutes to live, for TTL validity
+  --disclosed-quantity <n>   Disclosed quantity
+  --iceberg-legs <n>         Number of iceberg legs (2-50)
+  --iceberg-quantity <n>     Quantity per iceberg leg
+  --market-protection <pct>  Market protection for MARKET/SL-M: a % band (>0 to
+                             100), or -1 for Kite's automatic band (the default)
+  --autoslice                Auto-split into up to 10 orders if quantity exceeds
+                             the exchange freeze limit
+  --tag <tag>                Custom tag, max 20 alphanumeric characters
+  -h, --help                 display help for command
 
 Examples:
   $ kite orders place NSE:INFY -s BUY -q 1 --dry-run
       Preview the resolved order, send nothing
   $ kite orders place NSE:INFY -s BUY -q 10
       Market buy, delivery (CNC is the default)
+  $ kite orders place NSE:INFY -s BUY -q 10 --market-protection 2
+      Market buy, filling at most 2% away
   $ kite orders place NSE:INFY -s SELL -q 10 -t LIMIT -p 1650
       Limit sell at ₹1,650
   $ kite orders place NSE:INFY -s SELL -q 10 -t SL -p 1595 --trigger-price 1600
@@ -825,14 +829,16 @@ Usage: kite orders modify [options] <order-id>
 Modify a pending order
 
 Options:
-  -q, --quantity <n>       New quantity
-  -p, --price <price>      New limit price
-  --trigger-price <price>  New trigger price
-  -t, --type <type>        New order type (MARKET, LIMIT, SL, SL-M)
-  --validity <validity>    New validity (DAY, IOC, TTL)
-  --variety <variety>      Order variety (inferred from the orderbook if
-                           omitted)
-  -h, --help               display help for command
+  -q, --quantity <n>         New quantity
+  -p, --price <price>        New limit price
+  --trigger-price <price>    New trigger price
+  -t, --type <type>          New order type (MARKET, LIMIT, SL, SL-M)
+  --validity <validity>      New validity (DAY, IOC, TTL)
+  --market-protection <pct>  Market protection for MARKET/SL-M: a % band (>0 to
+                             100), or -1 for Kite's automatic band (the default)
+  --variety <variety>        Order variety (inferred from the orderbook if
+                             omitted)
+  -h, --help                 display help for command
 
 Examples:
   $ kite orders modify 250724000123456 -p 1655    Chase the price on a working limit order
