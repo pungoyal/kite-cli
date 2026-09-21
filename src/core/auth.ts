@@ -349,32 +349,49 @@ function pipeToCommand(command: string, args: string[], text: string): Promise<b
 }
 
 /**
- * Open a URL in the user's default browser.
+ * The fixed binary and argv that open `url` on `platform`, or null if the URL
+ * is not a plain http(s) URL.
  *
- * The URL is passed as an argv element to a fixed binary, never through a
- * shell, so a crafted URL cannot become command injection.
+ * The URL is always a single argv element to a fixed binary, never parsed by
+ * a shell. Windows is the trap: `cmd /c start "" <url>` looks shell-free, but
+ * cmd.exe re-parses its own command line, and Node does not quote `&` — so the
+ * login URL (`…?v=3&api_key=…`) was cut at the first `&` and the remainder run
+ * as a command. rundll32's URL handler takes the URL verbatim with no
+ * command-line interpreter in between.
+ *
+ * Only http(s) is accepted: every URL this CLI opens is Kite's, and refusing
+ * other schemes keeps a `file:` or custom-protocol handler from ever being
+ * launched on a caller's behalf.
  */
-export async function openBrowser(url: string): Promise<boolean> {
-  const { spawn } = await import('node:child_process');
-
-  let command: string;
-  let args: string[];
-  switch (process.platform) {
-    case 'darwin':
-      command = 'open';
-      args = [url];
-      break;
-    case 'win32':
-      // start is a cmd builtin; the empty string is the window-title argument,
-      // without which a quoted URL is treated as the title.
-      command = 'cmd';
-      args = ['/c', 'start', '', url];
-      break;
-    default:
-      command = 'xdg-open';
-      args = [url];
-      break;
+export function browserLauncher(
+  url: string,
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[] } | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
   }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+  const href = parsed.href;
+
+  switch (platform) {
+    case 'darwin':
+      return { command: 'open', args: [href] };
+    case 'win32':
+      return { command: 'rundll32', args: ['url.dll,FileProtocolHandler', href] };
+    default:
+      return { command: 'xdg-open', args: [href] };
+  }
+}
+
+/** Open a URL in the user's default browser. Resolves false if it could not. */
+export async function openBrowser(url: string): Promise<boolean> {
+  const launcher = browserLauncher(url);
+  if (!launcher) return false;
+  const { command, args } = launcher;
+  const { spawn } = await import('node:child_process');
 
   return new Promise((resolve) => {
     try {

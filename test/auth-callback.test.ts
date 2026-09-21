@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  browserLauncher,
   generateState,
   likelyHeadless,
   parseRequestTokenInput,
@@ -153,4 +154,30 @@ describe('likelyHeadless', () => {
     delete process.env.WAYLAND_DISPLAY;
     expect(likelyHeadless()).toBe(false);
   });
+});
+
+describe('browserLauncher', () => {
+  const login = 'https://kite.zerodha.com/connect/login?v=3&api_key=abc123';
+
+  it('passes the whole URL, ampersands and all, as one argv element on every platform', () => {
+    for (const platform of ['darwin', 'linux', 'win32'] as const) {
+      const launcher = browserLauncher(login, platform);
+      expect(launcher?.args.at(-1)).toBe(login);
+    }
+  });
+
+  it('never routes a URL through cmd.exe on Windows, which would split it at `&`', () => {
+    expect(browserLauncher(login, 'win32')).toEqual({
+      command: 'rundll32',
+      args: ['url.dll,FileProtocolHandler', login],
+    });
+    expect(browserLauncher('https://x.test/?a=1&calc.exe', 'win32')?.command).not.toMatch(/cmd|powershell/i);
+  });
+
+  it.each(['file:///etc/passwd', 'javascript:alert(1)', 'ms-settings:', 'not a url', ''])(
+    'refuses anything but http(s): %s',
+    (url) => {
+      expect(browserLauncher(url, 'linux')).toBeNull();
+    },
+  );
 });
