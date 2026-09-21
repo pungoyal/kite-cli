@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildModel, renderScript } from '../src/commands/completion.js';
 import { ExitCode } from '../src/core/errors.js';
 import { run } from '../src/run.js';
@@ -18,9 +18,16 @@ function shellPresent(shell: string): boolean {
   }
 }
 
+const scriptDirs: string[] = [];
+
+afterAll(() => {
+  for (const dir of scriptDirs) rmSync(dir, { recursive: true, force: true });
+});
+
 /** Write a generated script to a fresh temp file and return its path. */
 function writeScript(shell: 'bash' | 'zsh' | 'fish', script: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'kite-comp-'));
+  scriptDirs.push(dir);
   const path = join(dir, `kite.${shell}`);
   writeFileSync(path, script);
   return path;

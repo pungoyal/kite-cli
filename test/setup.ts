@@ -1,7 +1,8 @@
+import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import stripAnsi from 'strip-ansi';
-import { afterEach, beforeEach, expect } from 'vitest';
+import { afterAll, afterEach, beforeEach, expect } from 'vitest';
 
 /**
  * Global test setup.
@@ -15,11 +16,12 @@ import { afterEach, beforeEach, expect } from 'vitest';
 
 const REAL_CREDENTIAL_VARS = ['KITE_API_SECRET', 'KITE_ACCESS_TOKEN', 'KITE_API_KEY'];
 
+// Sandbox all filesystem state into a per-run temp directory. Rooted at the
+// OS temp dir (not a hardcoded /tmp) so the suite is portable to runners that
+// have no /tmp; VITEST_TMP still overrides when set.
+const tmpRoot = join(process.env['VITEST_TMP'] ?? tmpdir(), `kite-cli-test-${process.pid}`);
+
 beforeEach(() => {
-  // Sandbox all filesystem state into a per-run temp directory. Rooted at the
-  // OS temp dir (not a hardcoded /tmp) so the suite is portable to runners that
-  // have no /tmp; VITEST_TMP still overrides when set.
-  const tmpRoot = join(process.env['VITEST_TMP'] ?? tmpdir(), `kite-cli-test-${process.pid}`);
   process.env['KITE_CONFIG_DIR'] = join(tmpRoot, 'config');
   process.env['KITE_CACHE_DIR'] = join(tmpRoot, 'cache');
   // Never read or write the developer's actual keychain.
@@ -40,6 +42,12 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env['KITE_CREDENTIALS_PASSPHRASE'];
+});
+
+// The sandbox holds test sessions and encrypted credential files; leave none
+// of it behind in the shared temp dir.
+afterAll(() => {
+  rmSync(tmpRoot, { recursive: true, force: true });
 });
 
 // Strip ANSI in snapshots globally rather than per-assertion, so a forgotten
