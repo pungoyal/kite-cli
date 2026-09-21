@@ -34,6 +34,27 @@ updates:
           - minor
           - patch
 
+  # The VitePress docs site is a separate workspace with its own lockfile. It
+  # never ships in the package, but it builds in CI and deploys to Pages, so it
+  # still needs security and version updates.
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 5
+    commit-message:
+      prefix: deps-docs
+    groups:
+      docs:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
   # GitHub Actions are pinned to commit SHAs; Dependabot keeps them current
   # while preserving the pin (it bumps the SHA and updates the version comment).
   - package-ecosystem: github-actions
@@ -42,6 +63,8 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 5
     commit-message:
       prefix: ci
     groups:
