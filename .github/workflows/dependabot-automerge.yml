@@ -7,14 +7,17 @@ name: Dependabot auto-merge
 
 on: pull_request
 
-permissions:
-  contents: write
-  pull-requests: write
+# Nothing at the top level; only the auto-merge job, which runs solely for
+# Dependabot's own PRs, gets write access.
+permissions: {}
 
 jobs:
   auto-merge:
     if: ${{ github.actor == 'dependabot[bot]' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # merge the PR
+      pull-requests: write # enable auto-merge on it
     steps:
       - name: Fetch Dependabot metadata
         id: meta

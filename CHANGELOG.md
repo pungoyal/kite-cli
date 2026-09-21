@@ -8,6 +8,24 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`kite login` and `kite authorise` open the right page on Windows.** The
+  browser was launched through `cmd /c start`, and cmd.exe splits a command
+  line at `&`, so the login URL lost everything after `?v=3`, including your
+  API key, and the rest of the URL ran as a separate command. Windows now uses
+  the system URL handler, which receives the URL unparsed, and the CLI only
+  ever opens `http(s)` URLs.
+
+### Changed
+
+- **Project upkeep:** property-based fuzz tests (fast-check) for the ticker
+  frame decoder, CSV parser, secret redaction and instrument keys. The docs
+  site moves to patched vite 7, postcss and nanoid, clearing six advisories
+  that affected its dev server and build. The release workflow checks the
+  bundled npm version instead of installing an unpinned `npm@latest`, and the
+  Dependabot auto-merge workflow grants write access only to its job.
+
 ## [0.10.0] - 2026-09-21
 
 ### Fixed

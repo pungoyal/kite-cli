@@ -86,6 +86,7 @@
     "@types/ws": "^8.18.0",
     "@vitest/coverage-v8": "^5.0.1",
     "execa": "^10.0.0",
+    "fast-check": "^4.10.2",
     "msw": "^2.15.0",
     "publint": "^0.3.0",
     "strip-ansi": "^7.1.0",
