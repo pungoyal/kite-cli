@@ -8,6 +8,19 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-09-23
+
+v0.10.1 was tagged but never published to npm (its release run stalled at the
+approval gate), so this is the first npm release carrying the v0.10.1 fixes
+below, including the Windows `kite login` fix.
+
+### Changed
+
+- **Project upkeep:** a scheduled check now fails when the newest release tag is
+  not what npm serves as `latest`, so a stalled release no longer goes
+  unnoticed. The test suite removes its temporary directories after each file.
+  The README's documentation links now include the MCP server page.
+
 ## [0.10.1] - 2026-09-21
 
 ### Fixed
@@ -488,7 +501,8 @@ provenance-backed release from CI).
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/pungoyal/kite-cli/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/pungoyal/kite-cli/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/pungoyal/kite-cli/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/pungoyal/kite-cli/compare/v0.9.0...v0.9.1
