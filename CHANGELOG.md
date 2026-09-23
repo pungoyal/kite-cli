@@ -8,11 +8,21 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Changed
+
+- **Project upkeep:** each release now publishes its GitHub Release
+  automatically, with notes taken from this changelog, once npm has the
+  package. The scheduled release check also flags a published version that has
+  no GitHub Release.
+
 ## [0.10.2] - 2026-09-23
 
-v0.10.1 was tagged but never published to npm (its release run stalled at the
-approval gate), so this is the first npm release carrying the v0.10.1 fixes
-below, including the Windows `kite login` fix.
+v0.10.1 was tagged but never reached npm, because its release run stalled at
+the approval gate. This is the first npm release with its changes: on Windows,
+`kite login` and `kite authorise` now open the full login URL instead of
+cutting it off at the first `&` (details in the
+[0.10.1 notes](https://github.com/pungoyal/kite-cli/blob/main/CHANGELOG.md#0101---2026-09-21)).
+**Upgrade if you log in on Windows.**
 
 ### Changed
 
