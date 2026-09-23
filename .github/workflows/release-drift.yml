@@ -1,0 +1,44 @@
+name: Release drift
+
+# A release tag that never reaches npm fails silently: a run parked on the
+# `release` environment's approval gate reads "waiting", not "failed", and
+# v0.10.1 sat there unnoticed. This goes red when the newest v* tag is not what
+# npm serves as `latest`, once the tag is old enough that a release should have
+# finished.
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Newest tag is on npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Compare the newest tag with npm latest
+        env:
+          # Leaves time for a normal release run, approval included.
+          GRACE_HOURS: '6'
+        run: |
+          TAG="$(git tag --list 'v*' --sort=-version:refname | head -1)"
+          TAGGED_AT="$(git for-each-ref --format='%(creatordate:unix)' "refs/tags/$TAG")"
+          AGE_HOURS=$(( ($(date +%s) - TAGGED_AT) / 3600 ))
+          NPM="$(npm view @pungoyal/kite-cli dist-tags.latest)"
+          echo "newest tag: $TAG (${AGE_HOURS}h old), npm latest: v$NPM"
+          if [ "$TAG" = "v$NPM" ]; then exit 0; fi
+          if [ "$AGE_HOURS" -lt "$GRACE_HOURS" ]; then
+            echo "Tag is under ${GRACE_HOURS}h old; the release may still be running."
+            exit 0
+          fi
+          echo "::error::$TAG was tagged ${AGE_HOURS}h ago but npm latest is v$NPM. Check the Release workflow for a run waiting on approval or one that failed."
+          exit 1

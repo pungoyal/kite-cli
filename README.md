@@ -29,7 +29,7 @@ $ kite holdings
   Day's change  +₹287.40
 ```
 
-**Documentation:** [command reference](https://pungoyal.github.io/kite-cli/commands) · [safety model](https://pungoyal.github.io/kite-cli/safety) · [configuration](https://pungoyal.github.io/kite-cli/configuration) · [scripting](https://pungoyal.github.io/kite-cli/scripting) · [troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) · [library API](https://pungoyal.github.io/kite-cli/api)
+**Documentation:** [command reference](https://pungoyal.github.io/kite-cli/commands) · [safety model](https://pungoyal.github.io/kite-cli/safety) · [configuration](https://pungoyal.github.io/kite-cli/configuration) · [scripting](https://pungoyal.github.io/kite-cli/scripting) · [troubleshooting](https://pungoyal.github.io/kite-cli/troubleshooting) · [library API](https://pungoyal.github.io/kite-cli/api) · [MCP server](https://pungoyal.github.io/kite-cli/mcp)
 
 ## Why you can trust it
 
