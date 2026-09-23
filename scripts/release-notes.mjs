@@ -27,8 +27,8 @@ const BLOCK_START = /^(\s*([-*+]|\d+\.)\s|#|>|\||```)/;
 
 export function releaseNotes(changelog, version) {
   const lines = changelog.split('\n');
-  const escaped = version.replace(/\./g, '\\.');
-  const start = lines.findIndex((l) => new RegExp(`^## \\[${escaped}\\]`).test(l));
+  // A plain prefix match: the version is user input, so it never becomes a regex.
+  const start = lines.findIndex((l) => l.startsWith(`## [${version}]`));
   if (start === -1) throw new Error(`CHANGELOG.md has no "## [${version}]" section`);
   let end = lines.findIndex((l, i) => i > start && /^## /.test(l));
   if (end === -1) end = lines.length;

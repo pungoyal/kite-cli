@@ -108,6 +108,12 @@ describe('release-notes script', () => {
     expect(empty.stderr).toContain('is empty');
   });
 
+  it('treats the version literally, not as a pattern', async () => {
+    const { exitCode, stderr } = await notes('1.2.0(');
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('no "## [1.2.0(]" section');
+  });
+
   it('renders every released section of the real CHANGELOG.md', async () => {
     const versions = [...(await readFile(join(root, 'CHANGELOG.md'), 'utf8')).matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)];
     expect(versions.length).toBeGreaterThan(0);
