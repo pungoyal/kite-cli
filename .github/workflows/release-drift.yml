@@ -25,20 +25,27 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Compare the newest tag with npm latest
+      - name: Compare the newest tag with npm and GitHub Releases
         env:
           # Leaves time for a normal release run, approval included.
           GRACE_HOURS: '6'
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           TAG="$(git tag --list 'v*' --sort=-version:refname | head -1)"
           TAGGED_AT="$(git for-each-ref --format='%(creatordate:unix)' "refs/tags/$TAG")"
           AGE_HOURS=$(( ($(date +%s) - TAGGED_AT) / 3600 ))
           NPM="$(npm view @pungoyal/kite-cli dist-tags.latest)"
           echo "newest tag: $TAG (${AGE_HOURS}h old), npm latest: v$NPM"
-          if [ "$TAG" = "v$NPM" ]; then exit 0; fi
           if [ "$AGE_HOURS" -lt "$GRACE_HOURS" ]; then
             echo "Tag is under ${GRACE_HOURS}h old; the release may still be running."
             exit 0
           fi
-          echo "::error::$TAG was tagged ${AGE_HOURS}h ago but npm latest is v$NPM. Check the Release workflow for a run waiting on approval or one that failed."
-          exit 1
+          if [ "$TAG" != "v$NPM" ]; then
+            echo "::error::$TAG was tagged ${AGE_HOURS}h ago but npm latest is v$NPM. Check the Release workflow for a run waiting on approval or one that failed."
+            exit 1
+          fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::$TAG is on npm but has no GitHub Release. Dispatch the GitHub Release workflow with tag $TAG."
+            exit 1
+          fi

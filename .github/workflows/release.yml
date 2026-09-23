@@ -78,3 +78,14 @@ jobs:
       # npmjs.com/package/@pungoyal/kite-cli/access before the first release.
       - name: Publish
         run: npm publish
+
+  # Runs only after npm accepted the package, so a failed publish never leaves
+  # a release page for a version nobody can install.
+  github-release:
+    name: GitHub Release
+    needs: publish
+    permissions:
+      contents: write
+    uses: ./.github/workflows/github-release.yml
+    with:
+      tag: ${{ github.ref_name }}

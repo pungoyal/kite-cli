@@ -151,7 +151,9 @@ To cut a release:
 1. Make sure `main` is green in CI and the working tree is clean.
 2. Move the `## [Unreleased]` notes in `CHANGELOG.md` under a new
    `## [X.Y.Z] - YYYY-MM-DD` heading, and update the compare links at the bottom.
-   Commit it.
+   Open the section with a one-paragraph summary of what changed and who should
+   upgrade: it becomes the lead of the GitHub Release. Preview the release page
+   with `node scripts/release-notes.mjs X.Y.Z`. Commit it.
 3. Bump the version and create the matching tag in one step:
    ```bash
    npm version minor -m "release: v%s"   # or: patch / major
@@ -162,11 +164,26 @@ To cut a release:
    ```bash
    git push origin main --follow-tags
    ```
-5. The tag push triggers the release workflow, which re-runs typecheck, tests and
-   build, asserts the shebang survived, validates the package shape, checks that
-   the tag matches `package.json`, and then publishes with provenance. The same
-   tag deploys the documentation site, so the docs and the package go live
-   together.
+5. The tag push triggers the release workflow, which pauses for approval on the
+   `release` environment. **Approve it**: until you do, the run shows as
+   "waiting", not failed, and nothing is published.
+6. After approval it re-runs typecheck, tests and build, asserts the shebang
+   survived, validates the package shape, checks that the tag matches
+   `package.json`, and publishes to npm with provenance. Once npm has the
+   package, it creates the GitHub Release from that version's `CHANGELOG.md`
+   section ([`github-release.yml`](.github/workflows/github-release.yml)). The
+   same tag deploys the documentation site, so the docs, the package and the
+   release page go live together.
+
+The **Release drift** workflow checks every six hours that the newest tag is
+both npm's `latest` and a GitHub Release, and fails if a release has been stuck
+for more than six hours. To backfill a missing release page, or to refresh one
+after fixing its notes in `CHANGELOG.md` on `main`, dispatch the GitHub Release
+workflow. It is idempotent:
+
+```bash
+gh workflow run "GitHub Release" -f tag=vX.Y.Z
+```
 
 Verify a published release with:
 

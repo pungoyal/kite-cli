@@ -1,0 +1,76 @@
+name: GitHub Release
+
+# Creates (or refreshes) the GitHub Release for a tag, with notes taken from
+# that version's CHANGELOG.md section by scripts/release-notes.mjs. release.yml
+# calls this once npm has the package, so a release page never announces a
+# version you cannot install. Dispatch it by hand to backfill or refresh a
+# release; it is idempotent.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. v0.10.2'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # create and edit releases
+    env:
+      # Via env, never interpolated into a script: a dispatch input is
+      # user-controlled text.
+      TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Validate the tag
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$TAG' is not a vX.Y.Z tag"; exit 1; }
+          git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null || { echo "::error::$TAG does not exist"; exit 1; }
+
+      # The registry can take a moment to serve a version it just accepted.
+      - name: Wait for the version on npm
+        run: |
+          for _ in $(seq 1 12); do
+            [ "$(npm view "@pungoyal/kite-cli@${TAG#v}" version 2>/dev/null)" = "${TAG#v}" ] && exit 0
+            sleep 10
+          done
+          echo "::error::npm does not serve ${TAG#v}; refusing to announce a release that cannot be installed"
+          exit 1
+
+      # Notes come from the checked-out CHANGELOG.md, which on a dispatch is the
+      # branch's copy — so fixing a typo in old notes needs no new tag.
+      - name: Render notes
+        run: node scripts/release-notes.mjs "$TAG" > "$RUNNER_TEMP/notes.md"
+
+      - name: Publish the release
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            # Only the highest version is "Latest", so a backfill never demotes
+            # the current release.
+            NEWEST="$(git tag --list 'v*' --sort=-version:refname | head -1)"
+            LATEST=false
+            [ "$TAG" = "$NEWEST" ] && LATEST=true
+            gh release create "$TAG" --verify-tag --title "$TAG" \
+              --notes-file "$RUNNER_TEMP/notes.md" --latest="$LATEST"
+          fi
