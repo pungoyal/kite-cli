@@ -12,9 +12,9 @@ import { run } from '../src/run.js';
  *
  * Almost every case is a --dry-run against a MockAgent with net connect
  * disabled, so a request that escaped would throw rather than pass silently.
- * `gtt place` makes no network call of its own — it does not price the
- * instrument, because Kite does not need it to — and several tests below rely
- * on that: they register no interceptor at all.
+ * `gtt place` asks Kite for the last trade unless --last-price is given. Tests
+ * that register no interceptor for it see that lookup fail, as on an API key
+ * without quote access.
  */
 
 let agent: MockAgent;
@@ -76,7 +76,6 @@ interface GttFormBody {
     exchange: string;
     tradingsymbol: string;
     trigger_values: number[];
-    /** Asserted absent: the CLI must not invent a price Kite computes itself. */
     last_price?: number;
   };
   orders: Array<Record<string, unknown>>;
@@ -117,9 +116,9 @@ describe('gtt place: OCO at market', () => {
     // A BUY OCO closes a short: stoploss above, target below — and the wire
     // array ascends regardless of the order the flags were given in.
     expect(condition.trigger_values).toEqual([900, 1500]);
-    // Kite does not need last_price and computes it from its own feed, so the
-    // CLI must not invent one.
+    // No price could be fetched: sent without one, and the user warned.
     expect(condition).not.toHaveProperty('last_price');
+    expect(err).toMatch(/Kite refuses a GTT without one — pass --last-price/);
     expect(orders).toHaveLength(2);
     for (const order of orders) {
       expect(order).toMatchObject({
@@ -303,6 +302,37 @@ describe('gtt place: single leg', () => {
     // MARKET is never inferred from a missing price: a mistyped --price flag
     // must not become a market order.
     expect(err).toMatch(/--order-type MARKET/);
+  });
+});
+
+function interceptLtp(price: number) {
+  agent
+    .get('https://api.kite.trade')
+    .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
+    .reply(200, { status: 'success', data: { 'MCX:COPPER26AUGFUT': { instrument_token: 1, last_price: price } } });
+}
+
+describe('gtt place: last price', () => {
+  it("sends Kite's last trade, so a GTT can be created while the market is shut", async () => {
+    await seedSession();
+    interceptLtp(1331.5);
+    const captured = interceptPlace();
+
+    const code = await invoke([...COPPER, '--trigger', '1400', '-t', 'MARKET', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.body().condition.last_price).toBe(1331.5);
+  });
+
+  it('sends --last-price as given, without asking Kite', async () => {
+    await seedSession();
+    const captured = interceptPlace();
+
+    const code = await invoke([...COPPER, '--trigger', '1400', '-t', 'MARKET', '--last-price', '1320', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.body().condition.last_price).toBe(1320);
+    expect(err).not.toMatch(/Could not fetch a price/);
   });
 });
 

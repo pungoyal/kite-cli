@@ -970,13 +970,14 @@ Options:
   --product <product>       Product (CNC, NRML, MIS, MTF); required on a
                             derivatives exchange
   --last-price <price>      Reference price for percentage triggers and the
-                            leg-direction check; never sent to Kite
+                            leg-direction check, sent to Kite; defaults to
+                            Kite's last trade
   -h, --help                display help for command
 
 A GTT is either single-leg (--trigger, one --price) or an OCO (--stoploss and
 --target, priced with --stoploss-price and --target-price). The two shapes never
 mix, and for a SELL the stoploss sits below the last price while the target sits
-above — pass --last-price to have that checked before anything is created.
+above, checked against Kite's last trade (or --last-price) before anything is created.
 
 Examples:
   $ kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395
