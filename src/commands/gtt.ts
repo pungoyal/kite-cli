@@ -94,7 +94,7 @@ export const gttCommands: CommandFactory = (program, run) => {
     .option('--product <product>', `Product (${PRODUCTS.join(', ')}); required on a derivatives exchange`)
     .option(
       '--last-price <price>',
-      'Reference price for percentage triggers and the leg-direction check; never sent to Kite',
+      "Reference price for percentage triggers and the leg-direction check, sent to Kite; defaults to Kite's last trade",
     )
     .addHelpText(
       'after',
@@ -102,7 +102,7 @@ export const gttCommands: CommandFactory = (program, run) => {
 A GTT is either single-leg (--trigger, one --price) or an OCO (--stoploss and
 --target, priced with --stoploss-price and --target-price). The two shapes never
 mix, and for a SELL the stoploss sits below the last price while the target sits
-above — pass --last-price to have that checked before anything is created.
+above, checked against Kite's last trade (or --last-price) before anything is created.
 ${examples([
   [
     'kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395',
@@ -260,6 +260,21 @@ async function getGtt(ctx: Context, _opts: unknown, command: { args: string[] })
   );
 }
 
+/** Best-effort: the quote endpoint is rate-limited and not every API key may call it. */
+async function lastTradedPrice(ctx: Context, instrumentKey: string): Promise<number | undefined> {
+  try {
+    const ltp = await ctx.api.getLtp([instrumentKey], ctx.signal);
+    const price = ltp[instrumentKey]?.last_price;
+    if (price !== undefined) return price;
+  } catch {
+    // Warned below.
+  }
+  ctx.io.warn(
+    `Could not fetch a price for ${instrumentKey}; while the market is shut Kite refuses a GTT without one — pass --last-price.`,
+  );
+  return undefined;
+}
+
 async function placeGtt(
   ctx: Context,
   opts: {
@@ -296,10 +311,10 @@ async function placeGtt(
   const product = normaliseProduct(opts.product, instrument.exchange);
   const orderType = resolveOrderType(opts, isOco);
 
-  // Optional, and never sent to Kite — see buildCondition. It is here only so a
-  // percentage trigger has something to be a percentage of, and so the legs can
-  // be checked against the side they are supposed to be on.
-  const lastPrice = opts.lastPrice === undefined ? undefined : requirePrice(opts.lastPrice, '--last-price');
+  const lastPrice =
+    opts.lastPrice === undefined
+      ? await lastTradedPrice(ctx, instrumentKey)
+      : requirePrice(opts.lastPrice, '--last-price');
 
   const legs = isOco ? resolveOcoLegs(opts, side, orderType, lastPrice) : [resolveSingleLeg(opts, orderType)];
 
@@ -311,11 +326,9 @@ async function placeGtt(
       // Kite orders the array itself only in the sense that it index-matches it
       // to `orders`; the two must ascend together, which sortForWire does.
       trigger_values: legs.map((leg) => leg.trigger),
-      // `last_price` is deliberately absent. It is documented as a parameter but
-      // is not required, and Kite evaluates the condition against its own feed
-      // regardless — a client-supplied value is decorative at best and wrong at
-      // worst, and needing one is what used to make this command depend on a
-      // quote endpoint that not every API key may call.
+      // Without one Kite fetches its own, and while the market is shut it cannot:
+      // the create fails with "Unable to fetch last price".
+      ...(lastPrice !== undefined ? { last_price: lastPrice } : {}),
     },
     orders: legs.map((leg) => ({
       exchange: instrument.exchange,
@@ -353,10 +366,13 @@ async function placeGtt(
         value: side === 'BUY' ? ctx.io.green(side) : ctx.io.red(side),
       },
       { label: 'Quantity', value: quantity(qty) },
-      // Only shown when the user supplied one, and labelled as theirs: the CLI
-      // has no price of its own to offer and must not appear to.
       ...(lastPrice !== undefined
-        ? [{ label: 'Last price', value: `${rupees(lastPrice)} ${ctx.io.dim('(supplied with --last-price)')}` }]
+        ? [
+            {
+              label: 'Last price',
+              value: `${rupees(lastPrice)} ${ctx.io.dim(opts.lastPrice === undefined ? "(Kite's last trade)" : '(supplied with --last-price)')}`,
+            },
+          ]
         : []),
       // Displayed by name in Kite's own order, not in the order they go on the
       // wire: which leg is which is the thing being confirmed.

@@ -8,6 +8,15 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`kite gtt place` works while the market is shut.** Kite refuses a GTT
+  created without a last price on a closed day ("Unable to fetch last price"),
+  so the CLI now sends one: `--last-price` if given, otherwise Kite's last
+  trade. Percentage triggers and the leg-direction check use it too. If no price
+  can be fetched, the CLI warns and sends the GTT without one.
+  `GttParams.last_price` is documented to match.
+
 ### Changed
 
 - **Project upkeep:** each release now publishes its GitHub Release
