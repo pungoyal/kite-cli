@@ -19,6 +19,11 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ### Changed
 
+- **`kite gtt place --last-price` is now sent to Kite.** It used to be a local
+  reference only, for percentage triggers and the leg-direction check, so any
+  convenient figure would do. Kite now receives it as the GTT's last price, so
+  pass the instrument's current price, or leave the flag out and the CLI uses
+  Kite's last trade.
 - **Project upkeep:** each release now publishes its GitHub Release
   automatically, with notes taken from this changelog, once npm has the
   package. The scheduled release check also flags a published version that has

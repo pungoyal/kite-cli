@@ -305,11 +305,11 @@ describe('gtt place: single leg', () => {
   });
 });
 
-function interceptLtp(price: number) {
+function interceptLtp(price: number, key = 'MCX:COPPER26AUGFUT') {
   agent
     .get('https://api.kite.trade')
     .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
-    .reply(200, { status: 'success', data: { 'MCX:COPPER26AUGFUT': { instrument_token: 1, last_price: price } } });
+    .reply(200, { status: 'success', data: { [key]: { instrument_token: 1, last_price: price } } });
 }
 
 describe('gtt place: last price', () => {
@@ -332,6 +332,33 @@ describe('gtt place: last price', () => {
 
     expect(code).toBe(ExitCode.Ok);
     expect(captured.body().condition.last_price).toBe(1320);
+    expect(err).not.toMatch(/Could not fetch a price/);
+  });
+
+  it('checks the flags before asking Kite, so a typo costs no quote call', async () => {
+    await seedSession();
+
+    // No LTP interceptor: a lookup would fail and warn.
+    const code = await invoke([...COPPER, '--stoploss', 'abc', '--target', '2%', '-t', 'MARKET']);
+
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).toMatch(/--stoploss must be a positive number/);
+    expect(err).not.toMatch(/Could not fetch a price/);
+  });
+
+  it('stops on Ctrl-C during the lookup instead of carrying on without a price', async () => {
+    await seedSession();
+    agent
+      .get('https://api.kite.trade')
+      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
+      .reply(200, { status: 'success', data: { 'MCX:COPPER26AUGFUT': { instrument_token: 1, last_price: 1331.5 } } })
+      .delay(1_000);
+    // run() turns SIGINT into an abort of every in-flight request.
+    setTimeout(() => process.emit('SIGINT'), 20);
+
+    const code = await invoke([...COPPER, '--trigger', '1400', '-t', 'MARKET', '--yes']);
+
+    expect(code).toBe(ExitCode.Aborted);
     expect(err).not.toMatch(/Could not fetch a price/);
   });
 });
@@ -357,6 +384,18 @@ describe('gtt place: percentage triggers', () => {
     expect(code).toBe(ExitCode.Ok);
     // BUY: stoploss 2% above (1358.13), target 2% below (1304.87).
     expect(captured.body().condition.trigger_values).toEqual([1304.87, 1358.13]);
+  });
+
+  it("measures a percentage from Kite's last trade when --last-price is not given", async () => {
+    await seedSession();
+    interceptLtp(1331.5);
+    const captured = interceptPlace();
+
+    const code = await invoke([...COPPER, '--stoploss', '2%', '--target', '2%', '-t', 'MARKET', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.body().condition.trigger_values).toEqual([1304.87, 1358.13]);
+    expect(captured.body().condition.last_price).toBe(1331.5);
   });
 
   it('refuses a percentage with nothing to measure it from', async () => {
@@ -392,7 +431,17 @@ describe('gtt place: leg direction', () => {
     expect(err).toMatch(/Condition already met/);
   });
 
-  it('skips the check when no reference price was given', async () => {
+  it("refuses a stoploss on the wrong side of Kite's last trade", async () => {
+    await seedSession();
+    interceptLtp(1500, 'NSE:INFY');
+
+    const code = await invoke([...INFY, '--stoploss', '1700', '--target', '1400', '-t', 'MARKET']);
+
+    expect(code).toBe(ExitCode.Usage);
+    expect(err).toMatch(/stoploss must be below ₹1,500\.00/);
+  });
+
+  it('skips the check when no price was given or could be fetched', async () => {
     await seedSession();
     interceptPlace();
 
