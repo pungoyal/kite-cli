@@ -265,14 +265,16 @@ async function lastTradedPrice(ctx: Context, instrumentKey: string): Promise<num
   try {
     const ltp = await ctx.api.getLtp([instrumentKey], ctx.signal);
     const price = ltp[instrumentKey]?.last_price;
-    if (price !== undefined) return price;
+    // The schema defaults a missing price to 0, and an instrument that has
+    // never traded reports 0 too: neither is a price to send or measure from.
+    if (price !== undefined && price > 0) return price;
   } catch (err) {
     // A Ctrl-C is not a failed lookup: it must stop the command, not be
     // reported as a missing price and carried past.
     if (ctx.signal.aborted) throw ctx.signal.reason ?? err;
   }
   ctx.io.warn(
-    `Could not fetch a price for ${instrumentKey}; while the market is shut Kite refuses a GTT without one — pass --last-price.`,
+    `Could not fetch a price for ${instrumentKey}. While the market is shut Kite refuses a GTT without one — pass --last-price.`,
   );
   return undefined;
 }

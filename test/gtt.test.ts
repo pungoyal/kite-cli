@@ -324,6 +324,34 @@ describe('gtt place: last price', () => {
     expect(captured.body().condition.last_price).toBe(1331.5);
   });
 
+  it("labels the price in the preview as Kite's", async () => {
+    await seedSession();
+    interceptLtp(1331.5);
+
+    const code = await invoke([...COPPER, '--trigger', '1400', '-t', 'MARKET', '--dry-run']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(err).toMatch(/₹1,331\.50.*\(Kite's last trade\)/);
+  });
+
+  it.each([
+    ['reports a price of 0', { 'MCX:COPPER26AUGFUT': { instrument_token: 1, last_price: 0 } }],
+    ['does not know the instrument', {}],
+  ])('sends no price, and warns, when Kite %s', async (_, data) => {
+    await seedSession();
+    agent
+      .get('https://api.kite.trade')
+      .intercept({ path: (p) => p.startsWith('/quote/ltp'), method: 'GET' })
+      .reply(200, { status: 'success', data });
+    const captured = interceptPlace();
+
+    const code = await invoke([...COPPER, '--trigger', '1400', '-t', 'MARKET', '--yes']);
+
+    expect(code).toBe(ExitCode.Ok);
+    expect(captured.body().condition).not.toHaveProperty('last_price');
+    expect(err).toMatch(/Could not fetch a price for MCX:COPPER26AUGFUT/);
+  });
+
   it('sends --last-price as given, without asking Kite', async () => {
     await seedSession();
     const captured = interceptPlace();
@@ -333,6 +361,7 @@ describe('gtt place: last price', () => {
     expect(code).toBe(ExitCode.Ok);
     expect(captured.body().condition.last_price).toBe(1320);
     expect(err).not.toMatch(/Could not fetch a price/);
+    expect(err).toMatch(/₹1,320\.00.*\(supplied with --last-price\)/);
   });
 
   it('checks the flags before asking Kite, so a typo costs no quote call', async () => {
