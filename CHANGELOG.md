@@ -8,6 +8,14 @@ While the version is `0.x`, minor releases may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-02
+
+`kite gtt place` now works while the market is shut. Kite refuses a GTT
+created without a last price on a closed day, so the CLI now sends one. This
+changes what `--last-price` does: it used to stay local and is now sent to
+Kite, so pass the instrument's current price or leave the flag out. **Upgrade
+if you place GTTs, and check any scripts that pass `--last-price`.**
+
 ### Fixed
 
 - **`kite gtt place` works while the market is shut.** Kite refuses a GTT
@@ -28,6 +36,8 @@ While the version is `0.x`, minor releases may contain breaking changes.
   automatically, with notes taken from this changelog, once npm has the
   package. The scheduled release check also flags a published version that has
   no GitHub Release.
+- **Dependencies:** in-range updates to `zod` 4.6.7, `undici` 8.11.2, `ws`
+  8.22, and `@napi-rs/keyring` 2.1.1.
 
 ## [0.10.2] - 2026-09-23
 
@@ -525,7 +535,8 @@ provenance-backed release from CI).
 - No mutating HTTP verb (`POST`/`PUT`/`DELETE`) is ever retried automatically. A timed-out placement is reconciled against a unique client tag rather than blindly re-sent.
 - Client-side rate limiting per endpoint category, with the documented per-minute and per-day order caps enforced as a runaway-loop backstop.
 
-[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/pungoyal/kite-cli/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/pungoyal/kite-cli/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/pungoyal/kite-cli/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/pungoyal/kite-cli/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/pungoyal/kite-cli/compare/v0.9.1...v0.10.0
