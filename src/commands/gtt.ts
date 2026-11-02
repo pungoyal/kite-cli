@@ -94,7 +94,7 @@ export const gttCommands: CommandFactory = (program, run) => {
     .option('--product <product>', `Product (${PRODUCTS.join(', ')}); required on a derivatives exchange`)
     .option(
       '--last-price <price>',
-      'Reference price for percentage triggers and the leg-direction check; never sent to Kite',
+      "The instrument's current price, sent to Kite with the GTT and used for percentage triggers and the leg-direction check; defaults to Kite's last trade",
     )
     .addHelpText(
       'after',
@@ -102,7 +102,7 @@ export const gttCommands: CommandFactory = (program, run) => {
 A GTT is either single-leg (--trigger, one --price) or an OCO (--stoploss and
 --target, priced with --stoploss-price and --target-price). The two shapes never
 mix, and for a SELL the stoploss sits below the last price while the target sits
-above — pass --last-price to have that checked before anything is created.
+above, checked against Kite's last trade (or --last-price) before anything is created.
 ${examples([
   [
     'kite gtt place NSE:INFY -s SELL -q 10 --trigger 1400 --price 1395',
@@ -260,6 +260,25 @@ async function getGtt(ctx: Context, _opts: unknown, command: { args: string[] })
   );
 }
 
+/** Best-effort: the quote endpoint is rate-limited and not every API key may call it. */
+async function lastTradedPrice(ctx: Context, instrumentKey: string): Promise<number | undefined> {
+  try {
+    const ltp = await ctx.api.getLtp([instrumentKey], ctx.signal);
+    const price = ltp[instrumentKey]?.last_price;
+    // The schema defaults a missing price to 0, and an instrument that has
+    // never traded reports 0 too: neither is a price to send or measure from.
+    if (price !== undefined && price > 0) return price;
+  } catch (err) {
+    // A Ctrl-C is not a failed lookup: it must stop the command, not be
+    // reported as a missing price and carried past.
+    if (ctx.signal.aborted) throw ctx.signal.reason ?? err;
+  }
+  ctx.io.warn(
+    `Could not fetch a price for ${instrumentKey}. While the market is shut Kite refuses a GTT without one — pass --last-price.`,
+  );
+  return undefined;
+}
+
 async function placeGtt(
   ctx: Context,
   opts: {
@@ -296,12 +315,16 @@ async function placeGtt(
   const product = normaliseProduct(opts.product, instrument.exchange);
   const orderType = resolveOrderType(opts, isOco);
 
-  // Optional, and never sent to Kite — see buildCondition. It is here only so a
-  // percentage trigger has something to be a percentage of, and so the legs can
-  // be checked against the side they are supposed to be on.
-  const lastPrice = opts.lastPrice === undefined ? undefined : requirePrice(opts.lastPrice, '--last-price');
+  // Everything that can be checked without a price is checked before asking
+  // Kite for one: a typo should cost neither a call against the 1/sec quote
+  // limit nor a warning about a price it never needed.
+  const suppliedLastPrice = opts.lastPrice === undefined ? undefined : requirePrice(opts.lastPrice, '--last-price');
+  const single = isOco ? undefined : resolveSingleLeg(opts, orderType);
+  const oco = isOco ? parseOcoLegs(opts, orderType) : undefined;
 
-  const legs = isOco ? resolveOcoLegs(opts, side, orderType, lastPrice) : [resolveSingleLeg(opts, orderType)];
+  const lastPrice = suppliedLastPrice ?? (await lastTradedPrice(ctx, instrumentKey));
+
+  const legs = oco ? resolveOcoLegs(oco, side, lastPrice) : [single!];
 
   const params: GttParams = {
     type,
@@ -311,11 +334,9 @@ async function placeGtt(
       // Kite orders the array itself only in the sense that it index-matches it
       // to `orders`; the two must ascend together, which sortForWire does.
       trigger_values: legs.map((leg) => leg.trigger),
-      // `last_price` is deliberately absent. It is documented as a parameter but
-      // is not required, and Kite evaluates the condition against its own feed
-      // regardless — a client-supplied value is decorative at best and wrong at
-      // worst, and needing one is what used to make this command depend on a
-      // quote endpoint that not every API key may call.
+      // Without one Kite fetches its own, and while the market is shut it cannot:
+      // the create fails with "Unable to fetch last price".
+      ...(lastPrice !== undefined ? { last_price: lastPrice } : {}),
     },
     orders: legs.map((leg) => ({
       exchange: instrument.exchange,
@@ -353,10 +374,13 @@ async function placeGtt(
         value: side === 'BUY' ? ctx.io.green(side) : ctx.io.red(side),
       },
       { label: 'Quantity', value: quantity(qty) },
-      // Only shown when the user supplied one, and labelled as theirs: the CLI
-      // has no price of its own to offer and must not appear to.
       ...(lastPrice !== undefined
-        ? [{ label: 'Last price', value: `${rupees(lastPrice)} ${ctx.io.dim('(supplied with --last-price)')}` }]
+        ? [
+            {
+              label: 'Last price',
+              value: `${rupees(lastPrice)} ${ctx.io.dim(opts.lastPrice === undefined ? "(Kite's last trade)" : '(supplied with --last-price)')}`,
+            },
+          ]
         : []),
       // Displayed by name in Kite's own order, not in the order they go on the
       // wire: which leg is which is the thing being confirmed.
@@ -448,6 +472,15 @@ function requirePrice(value: string, flag: string): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) throw new UsageError(`${flag} must be a positive number.`);
   return n;
+}
+
+/** A trigger as typed: an absolute price, or a percentage awaiting a last price. */
+type TriggerSpec = { kind: 'absolute'; price: number } | { kind: 'percent'; percent: number; flag: string };
+
+/** An OCO leg as given on the command line, before any last price is known. */
+interface OcoLegSpec {
+  trigger: TriggerSpec;
+  price?: number;
 }
 
 interface GttLeg {
@@ -558,6 +591,23 @@ function resolveSingleLeg(opts: PlaceOpts, orderType: GttOrderType): GttLeg {
 }
 
 /**
+ * Check an OCO's flags as typed. Nothing here needs a last price, so it runs
+ * before one is fetched.
+ */
+function parseOcoLegs(opts: PlaceOpts, orderType: GttOrderType): { stoploss: OcoLegSpec; target: OcoLegSpec } {
+  return {
+    stoploss: {
+      trigger: parseTrigger(opts.stoploss!, '--stoploss'),
+      ...(orderType === 'LIMIT' ? { price: requirePrice(opts.stoplossPrice!, '--stoploss-price') } : {}),
+    },
+    target: {
+      trigger: parseTrigger(opts.target!, '--target'),
+      ...(orderType === 'LIMIT' ? { price: requirePrice(opts.targetPrice!, '--target-price') } : {}),
+    },
+  };
+}
+
+/**
  * Build the two legs of an OCO, in the order they go on the wire.
  *
  * A BUY OCO closes a short: its stoploss is above the current price and its
@@ -566,31 +616,30 @@ function resolveSingleLeg(opts: PlaceOpts, orderType: GttOrderType): GttLeg {
  * ascending order Kite index-matches to `orders` follows from the geometry.
  */
 function resolveOcoLegs(
-  opts: PlaceOpts,
+  specs: { stoploss: OcoLegSpec; target: OcoLegSpec },
   side: 'BUY' | 'SELL',
-  orderType: GttOrderType,
   lastPrice: number | undefined,
 ): GttLeg[] {
   const stoplossIsAbove = side === 'BUY';
 
   const stoploss: GttLeg = {
     label: 'Stoploss',
-    trigger: parseTrigger(opts.stoploss!, '--stoploss', stoplossIsAbove, lastPrice),
-    ...(orderType === 'LIMIT' ? { price: requirePrice(opts.stoplossPrice!, '--stoploss-price') } : {}),
+    trigger: resolveTrigger(specs.stoploss.trigger, stoplossIsAbove, lastPrice),
+    ...(specs.stoploss.price !== undefined ? { price: specs.stoploss.price } : {}),
   };
   const target: GttLeg = {
     label: 'Target',
-    trigger: parseTrigger(opts.target!, '--target', !stoplossIsAbove, lastPrice),
-    ...(orderType === 'LIMIT' ? { price: requirePrice(opts.targetPrice!, '--target-price') } : {}),
+    trigger: resolveTrigger(specs.target.trigger, !stoplossIsAbove, lastPrice),
+    ...(specs.target.price !== undefined ? { price: specs.target.price } : {}),
   };
 
   if (stoploss.trigger === target.trigger) {
     throw new UsageError(`--stoploss and --target are both ${rupees(stoploss.trigger)}.`);
   }
 
-  // Only checkable against a reference price, which is optional. Without one,
-  // Kite decides — it evaluates the condition against its own feed anyway, and
-  // inventing a price to check against would be a guess dressed as a guard.
+  // Only checkable against a last price, and there is none when --last-price
+  // was not given and Kite's could not be fetched. Kite then decides; inventing
+  // a price to check against would be a guess dressed as a guard.
   if (lastPrice !== undefined) {
     assertOnExpectedSide(stoploss, stoplossIsAbove, lastPrice, side);
     assertOnExpectedSide(target, !stoplossIsAbove, lastPrice, side);
@@ -631,22 +680,27 @@ function displayOrder(legs: GttLeg[]): GttLeg[] {
  * The percentage is unsigned: which way to move follows from the leg and the
  * side, so there is no sign for the user to get backwards.
  */
-function parseTrigger(value: string, flag: string, above: boolean, lastPrice: number | undefined): number {
-  if (!value.trim().endsWith('%')) return requirePrice(value, flag);
+function parseTrigger(value: string, flag: string): TriggerSpec {
+  if (!value.trim().endsWith('%')) return { kind: 'absolute', price: requirePrice(value, flag) };
 
   const percent = Number(value.trim().slice(0, -1));
   if (!Number.isFinite(percent) || percent <= 0) {
     throw new UsageError(`${flag} must be a positive percentage, like 2%.`);
   }
+  return { kind: 'percent', percent, flag };
+}
+
+function resolveTrigger(spec: TriggerSpec, above: boolean, lastPrice: number | undefined): number {
+  if (spec.kind === 'absolute') return spec.price;
   if (lastPrice === undefined) {
     throw new UsageError(
-      `${flag} is a percentage, which is measured from the last price.`,
+      `${spec.flag} is a percentage, which is measured from the last price.`,
       'Pass --last-price <price>, or give an absolute trigger price.',
     );
   }
   // Two decimals is as fine as any Indian exchange quotes; Kite validates the
   // tick size itself when the order is actually placed.
-  return Math.round(lastPrice * (above ? 1 + percent / 100 : 1 - percent / 100) * 100) / 100;
+  return Math.round(lastPrice * (above ? 1 + spec.percent / 100 : 1 - spec.percent / 100) * 100) / 100;
 }
 
 function normaliseGttOrderType(value: string): GttOrderType {

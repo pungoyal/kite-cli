@@ -669,9 +669,9 @@ export interface GttParams {
     exchange: string;
     tradingsymbol: string;
     trigger_values: number[];
-    /** Optional. Kite documents it but does not require it, and evaluates the
-     * condition against its own feed either way — a trigger placed without one
-     * comes back with Kite's own last price filled in. */
+    /** Kite fires on its own feed either way, but without this it fetches a
+     * price at create time, and while the market is shut that fails with
+     * "Unable to fetch last price". */
     last_price?: number;
   };
   orders: Array<{
